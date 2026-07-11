@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Innerclock</title>
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Innerclock" />
+<meta name="theme-color" content="#0A0D16" />
+<style>
+  html, body { margin: 0; padding: 0; background: #0A0D16; overscroll-behavior: none; }
+  #root { min-height: 100vh; }
+</style>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef } = React;
+
+const MODES = [
+  { id: "kisa", label: "Kısa", seconds: 10 },
+  { id: "orta", label: "Orta", seconds: 30 },
+  { id: "uzun", label: "Uzun", seconds: 60 },
+  { id: "usta", label: "Usta", seconds: 300 },
+];
+
+function accuracyLabel(pct) {
+  if (pct >= 97) return { text: "Mükemmel", color: "#8FB89A" };
+  if (pct >= 90) return { text: "Çok iyi", color: "#C9B37E" };
+  if (pct >= 75) return { text: "Fena değil", color: "#D9A05B" };
+  return { text: "Zihnin başka yerdeydi", color: "#C9705E" };
+}
+
+const AD_SECONDS = 5;
+
+function TimePerceptionGame() {
+  const [modeIndex, setModeIndex] = useState(1);
+  const [customSeconds, setCustomSeconds] = useState(null);
+  const [customInput, setCustomInput] = useState("");
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [phase, setPhase] = useState("idle");
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [streak, setStreak] = useState(0);
+  const [glow, setGlow] = useState(0);
+  const [adSecondsLeft, setAdSecondsLeft] = useState(AD_SECONDS);
+  const [roundsPlayed, setRoundsPlayed] = useState(0);
+
+  const startTimeRef = useRef(0);
+  const rafRef = useRef(null);
+  const adIntervalRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [shareImage, setShareImage] = useState(null);
+  const [sharing, setSharing] = useState(false);
+  const mode = customSeconds
+    ? { id: "custom", label: "Manuel", seconds: customSeconds }
+    : MODES[modeIndex];
+
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (adIntervalRef.current) clearInterval(adIntervalRef.current);
+    };
+  }, []);
+
+  function handleStart() {
+    setResult(null);
+    startTimeRef.current = Date.now();
+    setPhase("counting");
+    const tick = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      setGlow((Math.sin(elapsed / 1400) + 1) / 2);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function handleStop() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const elapsedMs = Date.now() - startTimeRef.current;
+    const targetMs = mode.seconds * 1000;
+    const diffMs = Math.abs(elapsedMs - targetMs);
+    const pct = Math.max(0, 100 - (diffMs / targetMs) * 100);
+    const entry = { mode: mode.label, guessMs: elapsedMs, targetMs, pct, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 6));
+    setStreak((prev) => (pct >= 90 ? prev + 1 : 0));
+    setResult(entry);
+    setPhase("result");
+  }
+
+  function handleReset() {
+    setRoundsPlayed((r) => r + 1);
+    setPhase("ad");
+    setAdSecondsLeft(AD_SECONDS);
+    adIntervalRef.current = setInterval(() => {
+      setAdSecondsLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(adIntervalRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function skipAd() {
+    if (adIntervalRef.current) clearInterval(adIntervalRef.current);
+    setPhase("idle");
+    setResult(null);
+  }
+
+  function selectPreset(i) {
+    setModeIndex(i);
+    setCustomSeconds(null);
+    setShowCustomInput(false);
+  }
+
+  function openCustomInput() {
+    setShowCustomInput(true);
+    setCustomInput(customSeconds ? String(customSeconds) : "");
+  }
+
+  function confirmCustomSeconds() {
+    const val = parseInt(customInput, 10);
+    if (!isNaN(val) && val > 0 && val <= 3600) {
+      setCustomSeconds(val);
+      setShowCustomInput(false);
+    }
+  }
+
+  function drawArcIcon(ctx, cx, cy, r) {
+    const grad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+    grad.addColorStop(0, "#E8B36B");
+    grad.addColorStop(1, "#C9863F");
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * 300) / 360);
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = r * 0.1;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r * 0.35);
+    ctx.lineTo(cx, cy + r * 0.35);
+    ctx.strokeStyle = "#EDE7DA";
+    ctx.lineWidth = r * 0.115;
+    ctx.lineCap = "round";
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  async function shareResult() {
+    if (!result || !acc) return;
+    setSharing(true);
+    try {
+      const canvas = canvasRef.current || document.createElement("canvas");
+      canvasRef.current = canvas;
+      const W = 1080, H = 1920;
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext("2d");
+      const bgGrad = ctx.createRadialGradient(W / 2, H * 0.32, 100, W / 2, H * 0.32, H * 0.8);
+      bgGrad.addColorStop(0, "#161D2E");
+      bgGrad.addColorStop(1, "#080A11");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#6B7185";
+      ctx.font = "600 28px -apple-system, sans-serif";
+      ctx.fillText("İÇ SAAT", W / 2, 320);
+      drawArcIcon(ctx, W / 2, 620, 220);
+      ctx.fillStyle = "#EDE7DA";
+      ctx.font = "700 140px -apple-system, sans-serif";
+      ctx.fillText(`${result.pct.toFixed(0)}%`, W / 2, 1120);
+      ctx.fillStyle = acc.color;
+      ctx.font = "600 52px -apple-system, sans-serif";
+      ctx.fillText(acc.text, W / 2, 1210);
+      ctx.fillStyle = "#6B7185";
+      ctx.font = "400 36px -apple-system, sans-serif";
+      ctx.fillText(
+        `${mode.label} mod - ${(result.guessMs / 1000).toFixed(2)}sn / ${mode.seconds}sn hedef`,
+        W / 2, 1290
+      );
+      if (streak > 0) {
+        ctx.fillStyle = "#D9A05B";
+        ctx.font = "600 40px -apple-system, sans-serif";
+        ctx.fillText(`${streak} gun seri`, W / 2, 1370);
+      }
+      ctx.fillStyle = "#4A5063";
+      ctx.font = "500 34px -apple-system, sans-serif";
+      ctx.fillText("Innerclock", W / 2, H - 140);
+      const dataUrl = canvas.toDataURL("image/png");
+      setShareImage(dataUrl);
+      if (navigator.share) {
+        try {
+          const blob = await (await fetch(dataUrl)).blob();
+          const file = new File([blob], "innerclock-sonuc.png", { type: "image/png" });
+          if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: "Innerclock" });
+          }
+        } catch (shareErr) {}
+      }
+    } catch (err) {
+      console.error("Paylaşım kartı oluşturulamadı:", err);
+    } finally {
+      setSharing(false);
+    }
+  }
+
+  function closeShareCard() {
+    setShareImage(null);
+  }
+
+  function handleCircleClick() {
+    if (phase === "idle") handleStart();
+    else if (phase === "counting") handleStop();
+    else if (phase === "result") handleReset();
+  }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const avgPct = history.length > 0 ? history.reduce((s, h) => s + h.pct, 0) / history.length : null;
+
+  return (
+    <>
+    <div style={{
+      minHeight: "100vh", width: "100%",
+      background: "radial-gradient(circle at 50% 30%, #14192A 0%, #0A0D16 70%)",
+      color: "#C7CCDA", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      padding: "32px 20px 48px", boxSizing: "border-box",
+    }}>
+      <style>{`
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        .mono { font-variant-numeric: tabular-nums; }
+      `}</style>
+
+      <div style={{ textAlign: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#6B7185", marginBottom: 8 }}>İç Saat</div>
+        <h1 style={{ fontWeight: 600, fontSize: 24, color: "#EDE7DA", margin: 0 }}>Zamanı ne kadar iyi hissediyorsun?</h1>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, margin: "24px 0 8px", flexWrap: "wrap", justifyContent: "center" }}>
+        {MODES.map((m, i) => (
+          <button key={m.id} type="button" disabled={phase === "counting"} onClick={() => selectPreset(i)}
+            style={{
+              padding: "8px 16px", borderRadius: 999,
+              border: `1px solid ${!customSeconds && modeIndex === i ? "#D9A05B" : "#2A3040"}`,
+              background: !customSeconds && modeIndex === i ? "rgba(217,160,91,0.12)" : "transparent",
+              color: !customSeconds && modeIndex === i ? "#EDE7DA" : "#8B93A7",
+              fontSize: 13, cursor: phase === "counting" ? "default" : "pointer",
+              opacity: phase === "counting" ? 0.5 : 1,
+            }}>
+            {m.label} · {m.seconds >= 60 ? `${m.seconds / 60}dk` : `${m.seconds}sn`}
+          </button>
+        ))}
+        <button type="button" disabled={phase === "counting"} onClick={openCustomInput}
+          style={{
+            padding: "8px 16px", borderRadius: 999,
+            border: `1px solid ${customSeconds ? "#D9A05B" : "#2A3040"}`,
+            background: customSeconds ? "rgba(217,160,91,0.12)" : "transparent",
+            color: customSeconds ? "#EDE7DA" : "#8B93A7",
+            fontSize: 13, cursor: phase === "counting" ? "default" : "pointer",
+            opacity: phase === "counting" ? 0.5 : 1,
+          }}>
+          {customSeconds ? `Manuel · ${customSeconds}sn` : "Manuel ∞"}
+        </button>
+      </div>
+
+      {showCustomInput && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0 8px" }}>
+          <input type="number" inputMode="numeric" min="1" max="3600" autoFocus
+            value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && confirmCustomSeconds()}
+            placeholder="saniye"
+            style={{ width: 90, padding: "8px 10px", borderRadius: 8, border: "1px solid #2A3040", background: "#12161F", color: "#EDE7DA", fontSize: 13, textAlign: "center" }} />
+          <button type="button" onClick={confirmCustomSeconds}
+            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "rgba(217,160,91,0.2)", color: "#EDE7DA", fontSize: 13, cursor: "pointer" }}>
+            Tamam
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 20, fontSize: 12, color: "#6B7185", margin: "8px 0 32px" }}>
+        <span>Seri: <span style={{ color: "#D9A05B", fontWeight: 600 }}>{streak}</span></span>
+        {avgPct !== null && (
+          <span>Ortalama: <span style={{ color: "#8FB89A", fontWeight: 600 }}>{avgPct.toFixed(1)}%</span></span>
+        )}
+      </div>
+
+      {phase === "ad" ? (
+        <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: "1px solid #2A3040", background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#4A5063", marginBottom: 14 }}>
+            Reklam · {adSecondsLeft > 0 ? `${adSecondsLeft}sn` : "hazır"}
+          </div>
+          <div style={{ width: "100%", height: 140, borderRadius: 10, background: "repeating-linear-gradient(135deg, #232838, #232838 10px, #1C2130 10px, #1C2130 20px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6178", fontSize: 13, marginBottom: 18 }}>
+            Örnek reklam alanı
+          </div>
+          <button type="button" onClick={skipAd} disabled={adSecondsLeft > 0}
+            style={{ padding: "10px 22px", borderRadius: 999, border: "1px solid #2A3040", background: adSecondsLeft > 0 ? "transparent" : "rgba(217,160,91,0.15)", color: adSecondsLeft > 0 ? "#4A5063" : "#EDE7DA", fontSize: 13, cursor: adSecondsLeft > 0 ? "default" : "pointer" }}>
+            {adSecondsLeft > 0 ? `Geç (${adSecondsLeft})` : "Devam et"}
+          </button>
+        </div>
+      ) : (
+        <button type="button" onClick={handleCircleClick}
+          style={{
+            position: "relative", width: 200, height: 200, borderRadius: "50%", border: "1px solid #262C3C",
+            cursor: "pointer", padding: 0, marginBottom: 36,
+            background: phase === "counting" ? `radial-gradient(circle, rgba(217,160,91,${0.25 + glow * 0.15}) 0%, #1A150F 70%)` : phase === "result" ? "radial-gradient(circle, #1B2A22 0%, #10160F 75%)" : "radial-gradient(circle, #1C2333 0%, #12161F 75%)",
+            color: "#EDE7DA", fontSize: phase === "result" ? 20 : 16, fontWeight: 500,
+            boxShadow: phase === "counting" ? "0 0 40px rgba(217,160,91,0.2)" : "0 4px 24px rgba(0,0,0,0.4)",
+            animation: phase === "counting" ? "breathe 3.6s ease-in-out infinite" : "none",
+          }}>
+          {phase === "idle" && "Başla"}
+          {phase === "counting" && "Şimdi"}
+          {phase === "result" && "Tekrar"}
+        </button>
+      )}
+
+      <div style={{ textAlign: "center", minHeight: 90, maxWidth: 320 }}>
+        {phase === "ad" && (
+          <p style={{ color: "#4A5063", fontSize: 13, lineHeight: 1.6, margin: 0 }}>Reklam bitince kaldığın yerden devam ediyorsun.</p>
+        )}
+        {phase === "idle" && (
+          <p style={{ color: "#6B7185", fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+            Başla'ya bas, gözlerini kapat. Zihninde {mode.seconds >= 60 ? `${mode.seconds / 60} dakika` : `${mode.seconds} saniye`} geçtiğini hissettiğinde tekrar dokun.
+          </p>
+        )}
+        {phase === "counting" && (
+          <p style={{ color: "#4A5063", fontSize: 13, lineHeight: 1.6, margin: 0 }}>Gözlerin kapalı. Sayma, sadece hisset.</p>
+        )}
+        {phase === "result" && result && acc && (
+          <div>
+            <div className="mono" style={{ fontSize: 32, fontWeight: 600, color: "#EDE7DA", marginBottom: 4 }}>{(result.guessMs / 1000).toFixed(2)}sn</div>
+            <div style={{ fontSize: 12, color: "#6B7185", marginBottom: 10 }}>hedef {mode.seconds >= 60 ? `${mode.seconds / 60}dk` : `${mode.seconds}sn`}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 16 }}>{acc.text} · {result.pct.toFixed(1)}%</div>
+            <button type="button" onClick={shareResult} disabled={sharing}
+              style={{ padding: "9px 20px", borderRadius: 999, border: "1px solid #2A3040", background: "rgba(217,160,91,0.1)", color: "#D9A05B", fontSize: 13, fontWeight: 600, cursor: sharing ? "default" : "pointer", opacity: sharing ? 0.6 : 1 }}>
+              {sharing ? "Hazırlanıyor…" : "Paylaş"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {history.length > 0 && (
+        <div style={{ marginTop: 40, width: "100%", maxWidth: 320 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#4A5063", marginBottom: 10 }}>Son denemeler</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {history.map((h) => (
+              <div key={h.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B7185", padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+                <span>{h.mode}</span>
+                <span className="mono">{(h.guessMs / 1000).toFixed(2)}sn</span>
+                <span style={{ color: accuracyLabel(h.pct).color }}>{h.pct.toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {shareImage && (
+      <div onClick={closeShareCard}
+        style={{ position: "fixed", inset: 0, background: "rgba(5,6,10,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 50 }}>
+        <img src={shareImage} alt="Innerclock sonuç kartı" onClick={(e) => e.stopPropagation()}
+          style={{ width: "100%", maxWidth: 260, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", marginBottom: 12 }} />
+        <p style={{ color: "#6B7185", fontSize: 12, textAlign: "center", maxWidth: 260, margin: "0 0 16px", lineHeight: 1.5 }}>
+          Görsele uzun basıp "Resmi Kaydet" ile galerine ekleyebilirsin.
+        </p>
+        <button type="button" onClick={closeShareCard}
+          style={{ padding: "10px 22px", borderRadius: 999, border: "1px solid #2A3040", background: "rgba(217,160,91,0.1)", color: "#EDE7DA", fontSize: 13, cursor: "pointer" }}>
+          Kapat
+        </button>
+      </div>
+    )}
+    </>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<TimePerceptionGame />);
+</script>
+</body>
+</html>
