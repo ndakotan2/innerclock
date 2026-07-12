@@ -55,6 +55,17 @@ const PALETTE = {
   bad: "#C9705E",
 };
 
+const GAME_THEMES = {
+  innerclock: { accent: "#D9A05B", soft: "rgba(217,160,91,0.12)" },
+  reaction:   { accent: "#D97B6B", soft: "rgba(217,123,107,0.12)" },
+  memory:     { accent: "#9B8ED9", soft: "rgba(155,142,217,0.12)" },
+  count:      { accent: "#5BC2C9", soft: "rgba(91,194,201,0.12)" },
+  stroop:     { accent: "#C97BC0", soft: "rgba(201,123,192,0.12)" },
+  sudoku:     { accent: "#7FB88A", soft: "rgba(127,184,138,0.12)" },
+  "2048":     { accent: "#6B8FD9", soft: "rgba(107,143,217,0.12)" },
+  minesweeper:{ accent: "#8C97B8", soft: "rgba(140,151,184,0.12)" },
+};
+
 function Shell({ children }) {
   return (
     <div style={{
@@ -73,7 +84,7 @@ function Shell({ children }) {
   );
 }
 
-function TopBar({ title, onBack, onReport }) {
+function TopBar({ title, onBack, onReport, accent }) {
   return (
     <div style={{ width: "100%", maxWidth: 340, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
       <button type="button" onClick={onBack} style={{
@@ -81,7 +92,7 @@ function TopBar({ title, onBack, onReport }) {
       }}>‹ Oyunlar</button>
       <div style={{ fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.dim }}>{title}</div>
       <button type="button" onClick={onReport} style={{
-        background: "none", border: "none", color: PALETTE.amber, fontSize: 13, fontWeight: 600, padding: "6px 4px", cursor: "pointer",
+        background: "none", border: "none", color: accent || PALETTE.amber, fontSize: 13, fontWeight: 600, padding: "6px 4px", cursor: "pointer",
       }}>Rapor</button>
     </div>
   );
@@ -119,24 +130,31 @@ function AdScreen({ onDone }) {
 
 /* ---------------- HOME ---------------- */
 
-function RingIcon({ size = 40 }) {
+function RingIcon({ size = 40, color = "#D9A05B" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
-      <path d="M 50 12 A 38 38 0 1 1 20 92" fill="none" stroke="#D9A05B" strokeWidth="9" strokeLinecap="round" />
+      <path d="M 50 12 A 38 38 0 1 1 20 92" fill="none" stroke={color} strokeWidth="9" strokeLinecap="round" />
       <line x1="50" y1="35" x2="50" y2="65" stroke="#EDE7DA" strokeWidth="9" strokeLinecap="round" />
     </svg>
   );
 }
 
-function BoltIcon({ size = 40 }) {
+function BoltIcon({ size = 40, color = "#D9A05B" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
-      <polygon points="55,10 25,58 46,58 40,90 75,42 52,42" fill="#D9A05B" />
+      <polygon points="55,10 25,58 46,58 40,90 75,42 52,42" fill={color} />
     </svg>
   );
 }
 
-function GameCard({ icon, title, subtitle, stat, onClick, disabled }) {
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function GameCard({ icon, title, subtitle, stat, onClick, disabled, accent }) {
   return (
     <button type="button" onClick={disabled ? undefined : onClick}
       style={{
@@ -146,7 +164,7 @@ function GameCard({ icon, title, subtitle, stat, onClick, disabled }) {
         marginBottom: 12, textAlign: "left", cursor: disabled ? "default" : "pointer",
         opacity: disabled ? 0.45 : 1,
       }}>
-      <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(217,160,91,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+      <div style={{ width: 48, height: 48, borderRadius: 12, background: accent ? hexToRgba(accent, 0.1) : "rgba(217,160,91,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
         {icon}
       </div>
       <div style={{ flex: 1 }}>
@@ -155,48 +173,60 @@ function GameCard({ icon, title, subtitle, stat, onClick, disabled }) {
       </div>
       {!disabled && stat && (
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: PALETTE.amber, fontSize: 13, fontWeight: 700 }}>{stat}</div>
+          <div style={{ color: accent || PALETTE.amber, fontSize: 13, fontWeight: 700 }}>{stat}</div>
         </div>
       )}
     </button>
   );
 }
 
-function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, sudokuHistory }) {
-  const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
-  const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
-  const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
-  const countBest = countHistory.length ? Math.max(...countHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
-  const stroopBest = stroopHistory.length ? Math.max(...stroopHistory.map((h) => h.accuracyPct)).toFixed(0) + "%" : null;
-  const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
+function CategoryCard({ icon, title, subtitle, count, accent, onClick }) {
+  return (
+    <button type="button" onClick={onClick}
+      style={{
+        width: "100%", maxWidth: 340, display: "flex", alignItems: "center", gap: 16,
+        padding: "22px 20px", borderRadius: 20, border: `1px solid ${PALETTE.border}`,
+        background: `linear-gradient(135deg, ${hexToRgba(accent, 0.08)}, rgba(255,255,255,0.02))`,
+        marginBottom: 14, textAlign: "left", cursor: "pointer",
+      }}>
+      <div style={{ width: 54, height: 54, borderRadius: 14, background: hexToRgba(accent, 0.14), display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: PALETTE.bright, fontSize: 17, fontWeight: 700 }}>{title}</div>
+        <div style={{ color: PALETTE.dim, fontSize: 12, marginTop: 3 }}>{subtitle}</div>
+      </div>
+      <div style={{ color: accent, fontSize: 12, fontWeight: 600 }}>{count}</div>
+    </button>
+  );
+}
 
-  function selectGame(game) {
-    trackEvent("game_open", { game });
-    onSelect(game);
-  }
-
+function Home({ onSelect }) {
   return (
     <Shell>
-      <div style={{ textAlign: "center", marginBottom: 28 }}>
+      <div style={{ textAlign: "center", marginBottom: 32 }}>
         <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Innerclock</div>
-        <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Zihin Sporları</h1>
-        <p style={{ color: PALETTE.dim, fontSize: 13, marginTop: 8, maxWidth: 280 }}>Her biri 30 saniyeden az sürüyor. Bir tane dene.</p>
+        <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Ne oynamak istersin?</h1>
       </div>
 
-      <GameCard icon={<RingIcon />} title="İç Saat" subtitle="Zamanı hisset" stat={icAvg}
-        onClick={() => selectGame("innerclock")} />
-      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 18, fontWeight: 700 }}>#</span>} title="Sayı Hafızası" subtitle="Kaç basamak hatırlarsın?" stat={memoryBest}
-        onClick={() => selectGame("memory")} />
-      <GameCard icon={<BoltIcon />} title="Reaksiyon" subtitle="Ne kadar hızlısın?" stat={reactionBest}
-        onClick={() => selectGame("reaction")} />
-      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 16 }}>●●●</span>} title="Hızlı Sayım" subtitle="Göz kararı ne kadar keskin?" stat={countBest}
-        onClick={() => selectGame("count")} />
-      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 14, fontWeight: 700 }}>Aa</span>} title="Renk Tuzağı" subtitle="Zihnin renge mi kelimeye mi kanıyor?" stat={stroopBest}
-        onClick={() => selectGame("stroop")} />
-      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 18 }}>⊞</span>} title="Sudoku" subtitle="Klasik mantık bulmacası" stat={sudokuBest}
-        onClick={() => selectGame("sudoku")} />
+      <CategoryCard
+        icon={<span style={{ fontSize: 22 }}>⚡</span>}
+        title="Zihin Sporları"
+        subtitle="Hızlı testler, her biri 30 saniyeden az"
+        count="5 oyun"
+        accent={GAME_THEMES.innerclock.accent}
+        onClick={() => onSelect("cat-mindsports")}
+      />
+      <CategoryCard
+        icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
+        title="Bulmacalar"
+        subtitle="Uzun soluklu klasikler"
+        count="3 oyun"
+        accent={GAME_THEMES.sudoku.accent}
+        onClick={() => onSelect("cat-puzzles")}
+      />
 
-      <button type="button" onClick={() => selectGame("feedback")}
+      <button type="button" onClick={() => onSelect("feedback")}
         style={{
           marginTop: 20, background: "none", border: "none", color: PALETTE.dim,
           fontSize: 13, padding: "8px 4px", cursor: "pointer", textDecoration: "underline",
@@ -205,6 +235,69 @@ function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistor
         Bir fikrin mi var? Bize yaz
       </button>
     </Shell>
+  );
+}
+
+function CategoryList({ title, onBack, onSelectGame, children }) {
+  return (
+    <Shell>
+      <div style={{ width: "100%", maxWidth: 340, display: "flex", alignItems: "center", marginBottom: 20 }}>
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: PALETTE.dim, fontSize: 14, padding: "6px 4px", cursor: "pointer" }}>‹ Kategoriler</button>
+      </div>
+      <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 20 }}>{title}</div>
+      {children}
+    </Shell>
+  );
+}
+
+function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory }) {
+  const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
+  const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
+  const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
+  const countBest = countHistory.length ? Math.max(...countHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const stroopBest = stroopHistory.length ? Math.max(...stroopHistory.map((h) => h.accuracyPct)).toFixed(0) + "%" : null;
+
+  function selectGame(game) {
+    trackEvent("game_open", { game });
+    onSelectGame(game);
+  }
+
+  return (
+    <CategoryList title="Zihin Sporları" onBack={onBack}>
+      <GameCard icon={<RingIcon color={GAME_THEMES.innerclock.accent} />} title="İç Saat" subtitle="Zamanı hisset" stat={icAvg} accent={GAME_THEMES.innerclock.accent}
+        onClick={() => selectGame("innerclock")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.memory.accent, fontSize: 18, fontWeight: 700 }}>#</span>} title="Sayı Hafızası" subtitle="Kaç basamak hatırlarsın?" stat={memoryBest} accent={GAME_THEMES.memory.accent}
+        onClick={() => selectGame("memory")} />
+      <GameCard icon={<BoltIcon color={GAME_THEMES.reaction.accent} />} title="Reaksiyon" subtitle="Ne kadar hızlısın?" stat={reactionBest} accent={GAME_THEMES.reaction.accent}
+        onClick={() => selectGame("reaction")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.count.accent, fontSize: 16 }}>●●●</span>} title="Hızlı Sayım" subtitle="Göz kararı ne kadar keskin?" stat={countBest} accent={GAME_THEMES.count.accent}
+        onClick={() => selectGame("count")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.stroop.accent, fontSize: 14, fontWeight: 700 }}>Aa</span>} title="Renk Tuzağı" subtitle="Zihnin renge mi kelimeye mi kanıyor?" stat={stroopBest} accent={GAME_THEMES.stroop.accent}
+        onClick={() => selectGame("stroop")} />
+    </CategoryList>
+  );
+}
+
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory }) {
+  const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
+  const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
+  const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
+  const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
+
+  function selectGame(game) {
+    trackEvent("game_open", { game });
+    onSelectGame(game);
+  }
+
+  return (
+    <CategoryList title="Bulmacalar" onBack={onBack}>
+      <GameCard icon={<span style={{ color: GAME_THEMES.sudoku.accent, fontSize: 18 }}>⊞</span>} title="Sudoku" subtitle="Klasik mantık bulmacası" stat={sudokuBest} accent={GAME_THEMES.sudoku.accent}
+        onClick={() => selectGame("sudoku")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES["2048"].accent, fontSize: 15, fontWeight: 800 }}>2048</span>} title="2048" subtitle="Kaydır, birleştir, büyüt" stat={best2048} accent={GAME_THEMES["2048"].accent}
+        onClick={() => selectGame("2048")} />
+      <GameCard icon={<span style={{ fontSize: 18 }}>💣</span>} title="Mayın Tarlası" subtitle="Sayılara güvenerek ilerle" stat={msBest} accent={GAME_THEMES.minesweeper.accent}
+        onClick={() => selectGame("minesweeper")} />
+    </CategoryList>
   );
 }
 
@@ -288,7 +381,7 @@ function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStre
 
   return (
     <Shell>
-      <TopBar title="İç Saat" onBack={onBack} onReport={onReport} />
+      <TopBar title="İç Saat" onBack={onBack} onReport={onReport} accent={GAME_THEMES.innerclock.accent} />
 
       <div style={{ display: "flex", gap: 8, margin: "4px 0 8px", flexWrap: "wrap", justifyContent: "center" }}>
         {MODES.map((m, i) => (
@@ -354,7 +447,7 @@ function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStre
         {phase === "ad" && <p style={{ color: PALETTE.faint, fontSize: 13, lineHeight: 1.6, margin: 0 }}>Reklam bitince kaldığın yerden devam ediyorsun.</p>}
         {phase === "idle" && (
           <p style={{ color: PALETTE.dim, fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-            Başla'ya bas, gözlerini kapat. Zihninde {mode.seconds >= 60 ? `${mode.seconds / 60} dakika` : `${mode.seconds} saniye`} geçtiğini hissettiğinde tekrar dokun.
+            Bir süre seç, Başla'ya bas ve gözlerini kapat. Zihninde {mode.seconds >= 60 ? `${mode.seconds / 60} dakika` : `${mode.seconds} saniye`} geçtiğini hissettiğin an ekrana dokun. Ne kadar yakın tahmin edersen o kadar yüksek doğruluk kazanırsın.
           </p>
         )}
         {phase === "counting" && <p style={{ color: PALETTE.faint, fontSize: 13, lineHeight: 1.6, margin: 0 }}>Gözlerin kapalı. Sayma, sadece hisset.</p>}
@@ -428,20 +521,21 @@ function ReactionGame({ onBack, onReport, history, setHistory }) {
 
   function finishAd() { startRound(); }
 
+  const ACCENT = GAME_THEMES.reaction.accent;
   const label = lastMs !== null ? reactionLabel(lastMs) : null;
   const bg =
     phase === "ready" ? "radial-gradient(circle, #2A4A32 0%, #10160F 75%)" :
     phase === "waiting" ? "radial-gradient(circle, #2A1A1A 0%, #12161F 75%)" :
     phase === "tooearly" ? "radial-gradient(circle, #3A2020 0%, #12161F 75%)" :
     phase === "result" ? "radial-gradient(circle, #1B2A22 0%, #10160F 75%)" :
-    "radial-gradient(circle, #1C2333 0%, #12161F 75%)";
+    `radial-gradient(circle, ${hexToRgba(ACCENT, 0.18)} 0%, #12161F 75%)`;
 
   return (
     <Shell>
-      <TopBar title="Reaksiyon" onBack={onBack} onReport={onReport} />
+      <TopBar title="Reaksiyon" onBack={onBack} onReport={onReport} accent={ACCENT} />
 
-      <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
-        Daireye dokun, bekle. Renk değiştiği an tekrar dokun — ne kadar erken, o kadar iyi.
+      <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+        Ortadaki daireye dokunarak başla. Bir süre bekleyeceksin, sonra dairenin rengi değişecek — o an geldiğinde elinden geldiğince hızlı tekrar dokun. Renk değişmeden dokunursan "çok erken" sayılır ve turu kaybedersin.
       </p>
 
       {phase === "ad" ? (
@@ -547,21 +641,24 @@ function MemoryGame({ onBack, onReport, history, setHistory }) {
 
   function finishAd() { setPhase("idle"); }
 
+  const ACCENT = GAME_THEMES.memory.accent;
+  const ACCENT_SOFT = GAME_THEMES.memory.soft;
+
   return (
     <Shell>
-      <TopBar title="Sayı Hafızası" onBack={onBack} onReport={onReport} />
+      <TopBar title="Sayı Hafızası" onBack={onBack} onReport={onReport} accent={ACCENT} />
 
       {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
-          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
-            Kısaca gösterilen sayı dizisini ezberle, sonra aynısını gir. Her doğru turda dizi bir hane uzar.
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Ekranda birkaç saniyeliğine bir sayı dizisi belirecek. Dizi kaybolunca, gördüğün rakamları aynı sırayla alttaki tuş takımından gir. Doğru girersen dizi bir hane uzar; yanlış girersen tur biter.
           </p>
           <button type="button" onClick={handleStart}
             style={{
               width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
-              cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)",
+              cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`,
               color: PALETTE.bright, fontSize: 16, fontWeight: 500,
             }}>Başla</button>
           {history.length > 0 && (
@@ -596,11 +693,11 @@ function MemoryGame({ onBack, onReport, history, setHistory }) {
               <div className="mono" style={{ fontSize: 20, color: PALETTE.dim, marginBottom: 6 }}>
                 Doğrusu: {sequence.join(" ")}
               </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.amber, marginBottom: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, color: ACCENT, marginBottom: 20 }}>
                 {longestCorrect} basamağa kadar hatırladın
               </div>
               <button type="button" onClick={reset}
-                style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
                 Tekrar
               </button>
             </div>
@@ -687,20 +784,22 @@ function CountGame({ onBack, onReport, history, setHistory }) {
   function finishAd() { handleStart(); }
 
   const acc = result ? accuracyLabel(result.pct) : null;
+  const ACCENT = GAME_THEMES.count.accent;
+  const ACCENT_SOFT = GAME_THEMES.count.soft;
 
   return (
     <Shell>
-      <TopBar title="Hızlı Sayım" onBack={onBack} onReport={onReport} />
+      <TopBar title="Hızlı Sayım" onBack={onBack} onReport={onReport} accent={ACCENT} />
 
       {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
-          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
-            Noktalar çok kısa süreliğine görünecek. Kaç tane olduğunu tahmin et.
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Kutunun içinde bir anlığına (yarım saniye kadar) birkaç nokta belirecek. Noktalar kaybolduktan sonra kaç tane gördüğünü tahmin edip alttaki tuş takımıyla gir. Ne kadar yakın tahmin edersen o kadar yüksek puan alırsın.
           </p>
           <button type="button" onClick={handleStart}
-            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
           {history.length > 0 && (
             <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{Math.max(...history.map((h) => h.pct)).toFixed(0)}</p>
           )}
@@ -716,7 +815,7 @@ function CountGame({ onBack, onReport, history, setHistory }) {
             {phase === "showing" && dots.map((d, i) => (
               <div key={i} style={{
                 position: "absolute", left: `${d.x}%`, top: `${d.y}%`, width: 14, height: 14,
-                borderRadius: "50%", background: PALETTE.amber, transform: "translate(-50%, -50%)",
+                borderRadius: "50%", background: ACCENT, transform: "translate(-50%, -50%)",
               }} />
             ))}
             {phase === "guess" && (
@@ -743,7 +842,7 @@ function CountGame({ onBack, onReport, history, setHistory }) {
                 <div />
               </div>
               <button type="button" onClick={confirmGuess} disabled={!guessInput}
-                style={{ padding: "10px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: guessInput ? PALETTE.amberSoft : "transparent", color: guessInput ? PALETTE.bright : PALETTE.faint, fontSize: 14, fontWeight: 600, cursor: guessInput ? "pointer" : "default" }}>
+                style={{ padding: "10px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: guessInput ? ACCENT_SOFT : "transparent", color: guessInput ? PALETTE.bright : PALETTE.faint, fontSize: 14, fontWeight: 600, cursor: guessInput ? "pointer" : "default" }}>
                 Onayla
               </button>
             </>
@@ -757,7 +856,7 @@ function CountGame({ onBack, onReport, history, setHistory }) {
           <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>gerçek sayı: {result.actual}</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text} · %{result.pct.toFixed(0)}</div>
           <button type="button" onClick={playAgain}
-            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
           </button>
         </div>
@@ -830,19 +929,22 @@ function StroopGame({ onBack, onReport, history, setHistory }) {
   function playAgain() { setPhase("ad"); }
   function finishAd() { handleStart(); }
 
+  const ACCENT = GAME_THEMES.stroop.accent;
+  const ACCENT_SOFT = GAME_THEMES.stroop.soft;
+
   return (
     <Shell>
-      <TopBar title="Renk Tuzağı" onBack={onBack} onReport={onReport} />
+      <TopBar title="Renk Tuzağı" onBack={onBack} onReport={onReport} accent={ACCENT} />
 
       {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
-          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
-            Kelimeyi değil, yazının rengini seç. {TOTAL_TRIALS} tur, zihnin seni yanıltmaya çalışacak.
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Ekranda bir renk adı belirecek (örneğin "KIRMIZI"), ama yazının kendisi farklı bir renkte olabilir. Kelimeyi değil, yazının gerçek rengini seç. {TOTAL_TRIALS} tur boyunca hem doğruluğun hem hızın ölçülür — zihnin seni kelimeye kanmaya zorlayacak.
           </p>
           <button type="button" onClick={handleStart}
-            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
           {history.length > 0 && (
             <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{Math.max(...history.map((h) => h.accuracyPct)).toFixed(0)}</p>
           )}
@@ -877,7 +979,7 @@ function StroopGame({ onBack, onReport, history, setHistory }) {
           <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{finalAccuracy ? finalAccuracy.toFixed(0) : 0}</div>
           <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>doğruluk · ortalama {finalAvgMs ? formatMs(finalAvgMs) : 0}ms</div>
           <button type="button" onClick={playAgain}
-            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
           </button>
         </div>
@@ -1136,10 +1238,12 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
   function finishAd() { startGame(); }
 
   const bestTime = history.length ? Math.min(...history.map((h) => h.timeMs)) : null;
+  const ACCENT = GAME_THEMES.sudoku.accent;
+  const ACCENT_SOFT = GAME_THEMES.sudoku.soft;
 
   return (
     <Shell>
-      <TopBar title="Sudoku" onBack={onBack} onReport={onReport} />
+      <TopBar title="Sudoku" onBack={onBack} onReport={onReport} accent={ACCENT} />
 
       {phase === "idle" && (
         <>
@@ -1148,18 +1252,18 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
               <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
                 style={{
                   padding: "8px 16px", borderRadius: 999,
-                  border: `1px solid ${difficultyIndex === i ? PALETTE.amber : PALETTE.border}`,
-                  background: difficultyIndex === i ? PALETTE.amberSoft : "transparent",
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
                   color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
                   fontSize: 13, cursor: "pointer",
                 }}>{d.label}</button>
             ))}
           </div>
-          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 24 }}>
-            Klasik 9x9. Diğerlerinden farklı olarak birkaç dakika sürebilir.
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Amaç: 9x9'luk ızgarayı, her satırda, her sütunda ve her 3x3'lük kutuda 1'den 9'a kadar rakamların birer kez geçeceği şekilde doldurmak. Boş bir hücreye dokun, sonra alttaki tuş takımından rakam seç. Beyaz rakamlar sabit, senin girdiklerin renkli görünür — yanlışsa kırmızıya döner. Diğerlerinden farklı olarak birkaç dakika sürebilir.
           </p>
           <button type="button" onClick={startGame}
-            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
           {bestTime !== null && (
             <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatClock(bestTime)}</p>
           )}
@@ -1175,11 +1279,11 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
       {phase === "playing" && puzzle && (
         <>
           <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
-            <span>Süre: <span className="mono" style={{ color: PALETTE.amber, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+            <span>Süre: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
             <span>Hata: <span style={{ color: mistakes > 0 ? PALETTE.bad : PALETTE.good, fontWeight: 600 }}>{mistakes}</span></span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", width: "100%", maxWidth: 306, aspectRatio: "1", border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", width: "100%", maxWidth: 342, aspectRatio: "1", border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
             {puzzle.map((row, ri) => row.map((val, ci) => {
               const isGiven = given[ri][ci];
               const isSelected = selected && selected.r === ri && selected.c === ci;
@@ -1189,12 +1293,12 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
                 <button key={`${ri}-${ci}`} type="button" onClick={() => selectCell(ri, ci)}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    background: isSelected ? "rgba(217,160,91,0.2)" : (boxIndex % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"),
+                    background: isSelected ? hexToRgba(ACCENT, 0.2) : (boxIndex % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"),
                     border: "none",
                     borderRight: (ci % 3 === 2 && ci !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
                     borderBottom: (ri % 3 === 2 && ri !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
-                    color: isGiven ? PALETTE.bright : isWrong ? PALETTE.bad : PALETTE.amber,
-                    fontWeight: isGiven ? 700 : 600, fontSize: 15, cursor: "pointer", padding: 0,
+                    color: isGiven ? PALETTE.bright : isWrong ? PALETTE.bad : ACCENT,
+                    fontWeight: isGiven ? 700 : 600, fontSize: 21, cursor: "pointer", padding: 0,
                   }}>
                   {val !== 0 ? val : ""}
                 </button>
@@ -1202,10 +1306,10 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
             }))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: 306, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: 342, marginBottom: 12 }}>
             {[1,2,3,4,5,6,7,8,9].map((n) => (
               <button key={n} type="button" onClick={() => pressDigit(n)}
-                style={{ padding: "10px 0", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                style={{ padding: "12px 0", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 18, fontWeight: 600, cursor: "pointer" }}>
                 {n}
               </button>
             ))}
@@ -1223,7 +1327,518 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
           <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>{mistakes} hata · {SUDOKU_DIFFICULTIES[difficultyIndex].label}</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.good, marginBottom: 24 }}>Tamamlandı!</div>
           <button type="button" onClick={playAgain}
-            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- 2048 ---------------- */
+
+function emptyGrid2048() {
+  return [[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0]];
+}
+
+function transpose2048(g) {
+  const t = emptyGrid2048();
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) t[c][r] = g[r][c];
+  return t;
+}
+
+function slideRowLeft2048(row) {
+  let arr = row.filter((v) => v !== 0);
+  let scoreGain = 0;
+  for (let i = 0; i < arr.length - 1; i++) {
+    if (arr[i] === arr[i + 1]) {
+      arr[i] *= 2;
+      scoreGain += arr[i];
+      arr[i + 1] = 0;
+      i++;
+    }
+  }
+  arr = arr.filter((v) => v !== 0);
+  while (arr.length < 4) arr.push(0);
+  return { row: arr, scoreGain };
+}
+
+function move2048(grid, direction) {
+  let g = grid.map((r) => r.slice());
+  let moved = false;
+  let totalScoreGain = 0;
+
+  function process(rows) {
+    return rows.map((row) => {
+      const before = row.join(",");
+      const { row: newRow, scoreGain } = slideRowLeft2048(row);
+      totalScoreGain += scoreGain;
+      if (newRow.join(",") !== before) moved = true;
+      return newRow;
+    });
+  }
+
+  if (direction === "left") {
+    g = process(g);
+  } else if (direction === "right") {
+    g = g.map((r) => r.slice().reverse());
+    g = process(g);
+    g = g.map((r) => r.slice().reverse());
+  } else if (direction === "up") {
+    g = transpose2048(g);
+    g = process(g);
+    g = transpose2048(g);
+  } else if (direction === "down") {
+    g = transpose2048(g);
+    g = g.map((r) => r.slice().reverse());
+    g = process(g);
+    g = g.map((r) => r.slice().reverse());
+    g = transpose2048(g);
+  }
+  return { grid: g, moved, scoreGain: totalScoreGain };
+}
+
+function addRandomTile2048(grid) {
+  const empties = [];
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) if (grid[r][c] === 0) empties.push([r, c]);
+  if (empties.length === 0) return grid;
+  const [r, c] = empties[Math.floor(Math.random() * empties.length)];
+  const next = grid.map((row) => row.slice());
+  next[r][c] = Math.random() < 0.9 ? 2 : 4;
+  return next;
+}
+
+function canMove2048(grid) {
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    if (grid[r][c] === 0) return true;
+  }
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+    const v = grid[r][c];
+    if (c < 3 && grid[r][c + 1] === v) return true;
+    if (r < 3 && grid[r + 1][c] === v) return true;
+  }
+  return false;
+}
+
+function tileStyle(value, ACCENT) {
+  if (value === 0) return { background: "rgba(255,255,255,0.02)", color: "transparent" };
+  const intensity = Math.min(1, Math.log2(value) / 11);
+  const bg = hexToRgba(ACCENT, 0.12 + intensity * 0.7);
+  const textColor = intensity > 0.45 ? "#0B0D14" : PALETTE.bright;
+  const fontSize = value >= 1000 ? 16 : value >= 100 ? 19 : 22;
+  return { background: bg, color: textColor, fontSize };
+}
+
+function game2048Message(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Kaydır, aynı sayıları birleştir, ilk skorunu görelim.";
+  const bestScore = Math.max(...history.map((h) => h.score));
+  const bestTile = Math.max(...history.map((h) => h.maxTile));
+  const avgScore = history.reduce((s, h) => s + h.score, 0) / history.length;
+  if (bestTile >= 2048) return `2048'e ulaşmışsın — en iyi skorun ${bestScore.toLocaleString("tr-TR")}. Bu, çoğu oyuncunun aylarca uğraştığı bir eşik.`;
+  if (bestTile >= 512) return `En yüksek ${bestTile} karosuna ulaştın, en iyi skorun ${bestScore.toLocaleString("tr-TR")}. 2048'e oldukça yakınsın.`;
+  if (bestTile >= 128) return `En yüksek ${bestTile} karosu, ortalama skorun ${Math.round(avgScore).toLocaleString("tr-TR")}. İyi gidiyor, kenarları boş tutmaya devam et.`;
+  return `En yüksek ${bestTile} karosuna ulaştın. İpucu: büyük sayıları bir köşede tutmaya çalışmak genelde işe yarıyor.`;
+}
+
+function Game2048({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [grid, setGrid] = useState(emptyGrid2048());
+  const [score, setScore] = useState(0);
+  const [finalEntry, setFinalEntry] = useState(null);
+  const touchStartRef = useRef(null);
+
+  const ACCENT = GAME_THEMES["2048"].accent;
+  const ACCENT_SOFT = GAME_THEMES["2048"].soft;
+
+  function startGame() {
+    let g = addRandomTile2048(emptyGrid2048());
+    g = addRandomTile2048(g);
+    setGrid(g);
+    setScore(0);
+    setFinalEntry(null);
+    setPhase("playing");
+  }
+
+  function handleMove(direction) {
+    if (phase !== "playing") return;
+    const { grid: moved, moved: didMove, scoreGain } = move2048(grid, direction);
+    if (!didMove) return;
+    const withNew = addRandomTile2048(moved);
+    const newScore = score + scoreGain;
+    setGrid(withNew);
+    setScore(newScore);
+    if (!canMove2048(withNew)) {
+      const maxTile = Math.max(...withNew.flat());
+      const entry = { score: newScore, maxTile, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      setFinalEntry(entry);
+      trackEvent("game_round_complete", { game: "2048", score: newScore, maxTile });
+      setPhase("result");
+    }
+  }
+
+  function onTouchStart(e) {
+    const t = e.touches[0];
+    touchStartRef.current = { x: t.clientX, y: t.clientY };
+  }
+  function onTouchEnd(e) {
+    if (!touchStartRef.current) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - touchStartRef.current.x;
+    const dy = t.clientY - touchStartRef.current.y;
+    touchStartRef.current = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      handleMove(dx > 0 ? "right" : "left");
+    } else {
+      handleMove(dy > 0 ? "down" : "up");
+    }
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestScoreEver = history.length ? Math.max(...history.map((h) => h.score)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="2048" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Ekranı bir yöne kaydır — ya da alttaki okları kullan. Aynı sayıya sahip iki karo yan yana gelince birleşip toplamlarına dönüşür. Her hamlede yeni bir karo belirir. Izgara dolup daha fazla hamle yapılamayınca oyun biter; amaç mümkün olan en yüksek sayıya ulaşmak.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestScoreEver !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi skor: {bestScoreEver.toLocaleString("tr-TR")}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && (
+        <>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
+            <span>Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{score.toLocaleString("tr-TR")}</span></span>
+          </div>
+
+          <div
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            style={{
+              display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
+              width: "100%", maxWidth: 320, aspectRatio: "1",
+              border: `2px solid ${PALETTE.border}`, borderRadius: 12, padding: 8,
+              boxSizing: "border-box", marginBottom: 20, background: "rgba(255,255,255,0.015)",
+            }}>
+            {grid.flat().map((val, i) => {
+              const style = tileStyle(val, ACCENT);
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  borderRadius: 8, fontWeight: 700, background: style.background,
+                  color: style.color, fontSize: style.fontSize,
+                }}>
+                  {val !== 0 ? val : ""}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, width: 160, marginBottom: 10 }}>
+            <div />
+            <button type="button" onClick={() => handleMove("up")} style={dpadBtnStyle(ACCENT)}>▲</button>
+            <div />
+            <button type="button" onClick={() => handleMove("left")} style={dpadBtnStyle(ACCENT)}>◀</button>
+            <button type="button" onClick={() => handleMove("down")} style={dpadBtnStyle(ACCENT)}>▼</button>
+            <button type="button" onClick={() => handleMove("right")} style={dpadBtnStyle(ACCENT)}>▶</button>
+          </div>
+          <p style={{ color: PALETTE.faint, fontSize: 11, textAlign: "center" }}>Izgara üzerinde kaydırabilir ya da okları kullanabilirsin.</p>
+        </>
+      )}
+
+      {phase === "result" && finalEntry && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{finalEntry.score.toLocaleString("tr-TR")}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>en yüksek karo: {finalEntry.maxTile}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.bad, marginBottom: 24 }}>Hamle kalmadı</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+function dpadBtnStyle(accent) {
+  return {
+    padding: "12px 0", borderRadius: 10, border: `1px solid ${PALETTE.border}`,
+    background: "rgba(255,255,255,0.03)", color: accent, fontSize: 14, cursor: "pointer",
+  };
+}
+
+/* ---------------- MAYIN TARLASI ---------------- */
+
+const MINESWEEPER_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", rows: 8, cols: 8, mines: 10 },
+  { id: "orta", label: "Orta", rows: 10, cols: 10, mines: 16 },
+  { id: "zor", label: "Zor", rows: 12, cols: 12, mines: 24 },
+];
+
+function makeEmptyMSGrid(rows, cols) {
+  return Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => ({ mine: false, revealed: false, flagged: false, adj: 0 }))
+  );
+}
+
+function placeMines(grid, rows, cols, mineCount, safeR, safeC) {
+  const forbidden = new Set();
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    const r = safeR + dr, c = safeC + dc;
+    if (r >= 0 && r < rows && c >= 0 && c < cols) forbidden.add(r * cols + c);
+  }
+  let placed = 0;
+  let guard = 0;
+  while (placed < mineCount && guard < 5000) {
+    guard++;
+    const idx = Math.floor(Math.random() * rows * cols);
+    if (forbidden.has(idx)) continue;
+    const r = Math.floor(idx / cols), c = idx % cols;
+    if (grid[r][c].mine) continue;
+    grid[r][c].mine = true;
+    placed++;
+  }
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (grid[r][c].mine) continue;
+    let count = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && grid[nr][nc].mine) count++;
+    }
+    grid[r][c].adj = count;
+  }
+  return grid;
+}
+
+function floodRevealMS(grid, rows, cols, startR, startC) {
+  const stack = [[startR, startC]];
+  while (stack.length) {
+    const [cr, cc] = stack.pop();
+    const cell = grid[cr][cc];
+    if (cell.revealed || cell.flagged) continue;
+    cell.revealed = true;
+    if (cell.adj === 0 && !cell.mine) {
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const nr = cr + dr, nc = cc + dc;
+        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !grid[nr][nc].revealed) stack.push([nr, nc]);
+      }
+    }
+  }
+}
+
+function checkMSWin(grid, rows, cols) {
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (!grid[r][c].mine && !grid[r][c].revealed) return false;
+  }
+  return true;
+}
+
+function msNumberColor(n) {
+  const colors = { 1: "#5E8FC9", 2: "#7FA88C", 3: "#C9705E", 4: "#9B8ED9", 5: "#C9A65E", 6: "#5BC2C9", 7: PALETTE.bright, 8: PALETTE.dim };
+  return colors[n] || PALETTE.bright;
+}
+
+function minesweeperMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. İlk turunda kaç mayına basmadan ızgarayı temizleyebileceğini görelim.";
+  const wins = history.filter((h) => h.outcome === "won");
+  const winRate = (wins.length / history.length) * 100;
+  if (wins.length === 0) return `Henüz kazanılmış bir turun yok (${history.length} deneme). Mayın Tarlası'nda ilk kazanç genelde en zor eşiktir — sayılara güvenerek ilerlemeye devam et.`;
+  const bestWinMs = Math.min(...wins.map((h) => h.timeMs));
+  if (winRate >= 70) return `Kazanma oranın %${winRate.toFixed(0)} — gayet güvenli oynuyorsun. En hızlı kazancın ${formatClock(bestWinMs)}.`;
+  if (winRate >= 40) return `Kazanma oranın %${winRate.toFixed(0)}. Sayılara göre bayrak koyma stratejin gelişiyor.`;
+  return `Kazanma oranın %${winRate.toFixed(0)} — bu oyun sabır ister, mayına basmadan önce çevredeki sayıları dikkatlice okumaya devam et.`;
+}
+
+function MinesweeperGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [grid, setGrid] = useState(null);
+  const [started, setStarted] = useState(false);
+  const [flagMode, setFlagMode] = useState(false);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [outcome, setOutcome] = useState(null);
+  const startTimeRef = useRef(0);
+  const timerRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.minesweeper.accent;
+  const ACCENT_SOFT = GAME_THEMES.minesweeper.soft;
+  const diff = MINESWEEPER_DIFFICULTIES[difficultyIndex];
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  function startGame() {
+    setGrid(makeEmptyMSGrid(diff.rows, diff.cols));
+    setStarted(false);
+    setFlagMode(false);
+    setElapsedMs(0);
+    setOutcome(null);
+    setPhase("playing");
+  }
+
+  function startTimer() {
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => setElapsedMs(Date.now() - startTimeRef.current), 500);
+  }
+
+  function endGame(g, result) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    const timeMs = Date.now() - startTimeRef.current;
+    const entry = { difficulty: diff.label, timeMs, outcome: result, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    setOutcome(result);
+    setGrid(g);
+    trackEvent("game_round_complete", { game: "minesweeper", difficulty: diff.label, outcome: result, timeMs });
+    setPhase("result");
+  }
+
+  function revealAllMines(g) {
+    for (let r = 0; r < diff.rows; r++) for (let c = 0; c < diff.cols; c++) {
+      if (g[r][c].mine) g[r][c].revealed = true;
+    }
+  }
+
+  function handleCellPress(r, c) {
+    if (phase !== "playing" || !grid) return;
+    const cell = grid[r][c];
+
+    if (flagMode) {
+      if (cell.revealed) return;
+      const g = grid.map((row) => row.map((cl) => ({ ...cl })));
+      g[r][c].flagged = !g[r][c].flagged;
+      setGrid(g);
+      return;
+    }
+
+    if (cell.revealed || cell.flagged) return;
+
+    let g = grid.map((row) => row.map((cl) => ({ ...cl })));
+    if (!started) {
+      placeMines(g, diff.rows, diff.cols, diff.mines, r, c);
+      setStarted(true);
+      startTimer();
+    }
+
+    if (g[r][c].mine) {
+      revealAllMines(g);
+      endGame(g, "lost");
+      return;
+    }
+
+    floodRevealMS(g, diff.rows, diff.cols, r, c);
+    setGrid(g);
+    if (checkMSWin(g, diff.rows, diff.cols)) {
+      endGame(g, "won");
+    }
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const flaggedCount = grid ? grid.flat().filter((c) => c.flagged).length : 0;
+  const minesLeft = diff.mines - flaggedCount;
+  const wins = history.filter((h) => h.outcome === "won");
+  const bestWinTime = wins.length ? Math.min(...wins.map((h) => h.timeMs)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Mayın Tarlası" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {MINESWEEPER_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label}</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Izgarada gizli mayınlar var. Bir hücreye dokun — açılan hücredeki sayı, çevresindeki kaç hücrede mayın olduğunu gösterir. İlk dokunuşun asla mayına denk gelmez. Mayın olmadığından eminsen "Bayrak" moduna geçip işaretle. Tüm güvenli hücreleri açınca kazanırsın.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestWinTime !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En hızlı kazanç: {formatClock(bestWinTime)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && grid && (
+        <>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 14, alignItems: "center" }}>
+            <span>Mayın: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{minesLeft}</span></span>
+            <span>Süre: <span className="mono" style={{ color: PALETTE.dim, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+          </div>
+
+          <button type="button" onClick={() => setFlagMode((f) => !f)}
+            style={{
+              marginBottom: 14, padding: "8px 18px", borderRadius: 999,
+              border: `1px solid ${flagMode ? ACCENT : PALETTE.border}`,
+              background: flagMode ? ACCENT_SOFT : "transparent",
+              color: flagMode ? PALETTE.bright : PALETTE.dim, fontSize: 13, cursor: "pointer",
+            }}>
+            🚩 Bayrak modu: {flagMode ? "Açık" : "Kapalı"}
+          </button>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: `repeat(${diff.cols}, 1fr)`,
+            width: "100%", maxWidth: 320, aspectRatio: `${diff.cols} / ${diff.rows}`,
+            border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 16,
+          }}>
+            {grid.flat().map((cell, i) => {
+              const r = Math.floor(i / diff.cols), c = i % diff.cols;
+              return (
+                <button key={i} type="button" onClick={() => handleCellPress(r, c)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: cell.revealed ? (cell.mine ? "rgba(201,112,94,0.3)" : "rgba(255,255,255,0.02)") : "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.04)",
+                    color: cell.revealed ? msNumberColor(cell.adj) : PALETTE.dim,
+                    fontWeight: 700, fontSize: diff.cols >= 12 ? 10 : diff.cols >= 10 ? 12 : 14,
+                    cursor: "pointer", padding: 0,
+                  }}>
+                  {cell.revealed ? (cell.mine ? "💣" : (cell.adj > 0 ? cell.adj : "")) : (cell.flagged ? "🚩" : "")}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>{outcome === "won" ? "🎉" : "💥"}</div>
+          <div className="mono" style={{ fontSize: 24, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatClock(elapsedMs)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: outcome === "won" ? PALETTE.good : PALETTE.bad, marginBottom: 24 }}>
+            {outcome === "won" ? "Kazandın!" : "Mayına bastın"}
+          </div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
           </button>
         </div>
@@ -1303,6 +1918,8 @@ function Report({ type, history, onBack }) {
     count: "Hızlı Sayım Raporu",
     stroop: "Renk Tuzağı Raporu",
     sudoku: "Sudoku Raporu",
+    "2048": "2048 Raporu",
+    minesweeper: "Mayın Tarlası Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -1312,6 +1929,8 @@ function Report({ type, history, onBack }) {
     count: countMessage,
     stroop: stroopMessage,
     sudoku: sudokuMessage,
+    "2048": game2048Message,
+    minesweeper: minesweeperMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -1336,8 +1955,17 @@ function Report({ type, history, onBack }) {
     } else if (type === "sudoku") {
       best = formatClock(Math.min(...history.map((h) => h.timeMs)));
       avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
+    } else if (type === "2048") {
+      best = Math.max(...history.map((h) => h.score)).toLocaleString("tr-TR");
+      avg = Math.round(history.reduce((s, h) => s + h.score, 0) / count).toLocaleString("tr-TR");
+    } else if (type === "minesweeper") {
+      const wins = history.filter((h) => h.outcome === "won");
+      best = wins.length ? formatClock(Math.min(...wins.map((h) => h.timeMs))) : "—";
+      avg = `%${((wins.length / count) * 100).toFixed(0)}`;
     }
   }
+
+  const ACCENT = GAME_THEMES[type] ? GAME_THEMES[type].accent : PALETTE.amber;
 
   return (
     <Shell>
@@ -1353,7 +1981,7 @@ function Report({ type, history, onBack }) {
           <div style={{ fontSize: 11, color: PALETTE.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>Tur</div>
         </div>
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 26, fontWeight: 700, color: PALETTE.amber }}>{best !== null ? best : "—"}</div>
+          <div style={{ fontSize: 26, fontWeight: 700, color: ACCENT }}>{best !== null ? best : "—"}</div>
           <div style={{ fontSize: 11, color: PALETTE.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>En iyi</div>
         </div>
         <div style={{ textAlign: "center" }}>
@@ -1364,7 +1992,7 @@ function Report({ type, history, onBack }) {
 
       <div style={{
         width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`,
-        background: "rgba(217,160,91,0.05)", padding: "20px 20px", marginBottom: 28,
+        background: hexToRgba(ACCENT, 0.05), padding: "20px 20px", marginBottom: 28,
       }}>
         <p style={{ color: PALETTE.bright, fontSize: 14, lineHeight: 1.7, margin: 0 }}>{message}</p>
       </div>
@@ -1413,6 +2041,19 @@ function Report({ type, history, onBack }) {
                     <span style={{ color: h.mistakes === 0 ? PALETTE.good : PALETTE.amber }}>{h.mistakes} hata</span>
                   </>
                 )}
+                {type === "2048" && (
+                  <>
+                    <span className="mono">{h.score.toLocaleString("tr-TR")}</span>
+                    <span style={{ color: GAME_THEMES["2048"].accent }}>en yüksek {h.maxTile}</span>
+                  </>
+                )}
+                {type === "minesweeper" && (
+                  <>
+                    <span>{h.difficulty}</span>
+                    <span className="mono">{formatClock(h.timeMs)}</span>
+                    <span style={{ color: h.outcome === "won" ? PALETTE.good : PALETTE.bad }}>{h.outcome === "won" ? "Kazandı" : "Kaybetti"}</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1433,20 +2074,32 @@ function App() {
   const [countHistory, setCountHistory] = useState([]);
   const [stroopHistory, setStroopHistory] = useState([]);
   const [sudokuHistory, setSudokuHistory] = useState([]);
+  const [game2048History, setGame2048History] = useState([]);
+  const [minesweeperHistory, setMinesweeperHistory] = useState([]);
 
   return (
     <>
-      {view === "home" && (
-        <Home
-          onSelect={setView}
+      {view === "home" && <Home onSelect={setView} />}
+      {view === "cat-mindsports" && (
+        <MindSportsList
+          onBack={() => setView("home")}
+          onSelectGame={setView}
           icHistory={icHistory} reactionHistory={reactionHistory}
           memoryHistory={memoryHistory} countHistory={countHistory} stroopHistory={stroopHistory}
+        />
+      )}
+      {view === "cat-puzzles" && (
+        <PuzzlesList
+          onBack={() => setView("home")}
+          onSelectGame={setView}
           sudokuHistory={sudokuHistory}
+          game2048History={game2048History}
+          minesweeperHistory={minesweeperHistory}
         />
       )}
       {view === "innerclock" && (
         <InnerclockGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-mindsports")}
           onReport={() => setView("report-innerclock")}
           history={icHistory} setHistory={setIcHistory}
           streak={icStreak} setStreak={setIcStreak}
@@ -1454,37 +2107,51 @@ function App() {
       )}
       {view === "reaction" && (
         <ReactionGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-mindsports")}
           onReport={() => setView("report-reaction")}
           history={reactionHistory} setHistory={setReactionHistory}
         />
       )}
       {view === "memory" && (
         <MemoryGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-mindsports")}
           onReport={() => setView("report-memory")}
           history={memoryHistory} setHistory={setMemoryHistory}
         />
       )}
       {view === "count" && (
         <CountGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-mindsports")}
           onReport={() => setView("report-count")}
           history={countHistory} setHistory={setCountHistory}
         />
       )}
       {view === "stroop" && (
         <StroopGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-mindsports")}
           onReport={() => setView("report-stroop")}
           history={stroopHistory} setHistory={setStroopHistory}
         />
       )}
       {view === "sudoku" && (
         <SudokuGame
-          onBack={() => setView("home")}
+          onBack={() => setView("cat-puzzles")}
           onReport={() => setView("report-sudoku")}
           history={sudokuHistory} setHistory={setSudokuHistory}
+        />
+      )}
+      {view === "2048" && (
+        <Game2048
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-2048")}
+          history={game2048History} setHistory={setGame2048History}
+        />
+      )}
+      {view === "minesweeper" && (
+        <MinesweeperGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-minesweeper")}
+          history={minesweeperHistory} setHistory={setMinesweeperHistory}
         />
       )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
@@ -1494,6 +2161,8 @@ function App() {
       {view === "report-count" && <Report type="count" history={countHistory} onBack={() => setView("count")} />}
       {view === "report-stroop" && <Report type="stroop" history={stroopHistory} onBack={() => setView("stroop")} />}
       {view === "report-sudoku" && <Report type="sudoku" history={sudokuHistory} onBack={() => setView("sudoku")} />}
+      {view === "report-2048" && <Report type="2048" history={game2048History} onBack={() => setView("2048")} />}
+      {view === "report-minesweeper" && <Report type="minesweeper" history={minesweeperHistory} onBack={() => setView("minesweeper")} />}
     </>
   );
 }
