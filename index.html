@@ -8,9 +8,18 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Innerclock" />
 <meta name="theme-color" content="#0A0D16" />
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-QMBNMCRZ8C"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-QMBNMCRZ8C');
+</script>
 <style>
   html, body { margin: 0; padding: 0; background: #0A0D16; overscroll-behavior: none; }
   #root { min-height: 100vh; }
+  * { -webkit-tap-highlight-color: transparent; }
 </style>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
@@ -22,6 +31,151 @@
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useRef } = React;
 
+function trackEvent(name, params) {
+  try {
+    if (typeof gtag === "function") gtag("event", name, params || {});
+  } catch (e) {
+    // sessizce yut - analitik hatası oyunu bozmasın
+  }
+}
+
+/* ---------------- shared visual helpers ---------------- */
+
+const PALETTE = {
+  bg: "radial-gradient(circle at 50% 30%, #14192A 0%, #0A0D16 70%)",
+  text: "#C7CCDA",
+  dim: "#6B7185",
+  faint: "#4A5063",
+  bright: "#EDE7DA",
+  amber: "#D9A05B",
+  amberSoft: "rgba(217,160,91,0.12)",
+  border: "#2A3040",
+  good: "#8FB89A",
+  mid: "#C9B37E",
+  bad: "#C9705E",
+};
+
+function Shell({ children }) {
+  return (
+    <div style={{
+      minHeight: "100vh", width: "100%", background: PALETTE.bg, color: PALETTE.text,
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      padding: "32px 20px 48px", boxSizing: "border-box",
+    }}>
+      <style>{`
+        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+        .mono { font-variant-numeric: tabular-nums; }
+      `}</style>
+      {children}
+    </div>
+  );
+}
+
+function TopBar({ title, onBack, onReport }) {
+  return (
+    <div style={{ width: "100%", maxWidth: 340, display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+      <button type="button" onClick={onBack} style={{
+        background: "none", border: "none", color: PALETTE.dim, fontSize: 14, padding: "6px 4px", cursor: "pointer",
+      }}>‹ Oyunlar</button>
+      <div style={{ fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.dim }}>{title}</div>
+      <button type="button" onClick={onReport} style={{
+        background: "none", border: "none", color: PALETTE.amber, fontSize: 13, fontWeight: 600, padding: "6px 4px", cursor: "pointer",
+      }}>Rapor</button>
+    </div>
+  );
+}
+
+/* ---------------- HOME ---------------- */
+
+function RingIcon({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <path d="M 50 12 A 38 38 0 1 1 20 92" fill="none" stroke="#D9A05B" strokeWidth="9" strokeLinecap="round" />
+      <line x1="50" y1="35" x2="50" y2="65" stroke="#EDE7DA" strokeWidth="9" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function BoltIcon({ size = 40 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100">
+      <polygon points="55,10 25,58 46,58 40,90 75,42 52,42" fill="#D9A05B" />
+    </svg>
+  );
+}
+
+function GameCard({ icon, title, subtitle, stat, onClick, disabled }) {
+  return (
+    <button type="button" onClick={disabled ? undefined : onClick}
+      style={{
+        width: "100%", maxWidth: 340, display: "flex", alignItems: "center", gap: 16,
+        padding: "18px 18px", borderRadius: 18, border: `1px solid ${PALETTE.border}`,
+        background: disabled ? "rgba(255,255,255,0.015)" : "rgba(255,255,255,0.03)",
+        marginBottom: 12, textAlign: "left", cursor: disabled ? "default" : "pointer",
+        opacity: disabled ? 0.45 : 1,
+      }}>
+      <div style={{ width: 48, height: 48, borderRadius: 12, background: "rgba(217,160,91,0.08)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ color: PALETTE.bright, fontSize: 16, fontWeight: 600 }}>{title}</div>
+        <div style={{ color: PALETTE.dim, fontSize: 12, marginTop: 2 }}>{disabled ? "Yakında" : subtitle}</div>
+      </div>
+      {!disabled && stat && (
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: PALETTE.amber, fontSize: 13, fontWeight: 700 }}>{stat}</div>
+        </div>
+      )}
+    </button>
+  );
+}
+
+function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory }) {
+  const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
+  const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
+  const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
+  const countBest = countHistory.length ? Math.max(...countHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const stroopBest = stroopHistory.length ? Math.max(...stroopHistory.map((h) => h.accuracyPct)).toFixed(0) + "%" : null;
+
+  function selectGame(game) {
+    trackEvent("game_open", { game });
+    onSelect(game);
+  }
+
+  return (
+    <Shell>
+      <div style={{ textAlign: "center", marginBottom: 28 }}>
+        <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Innerclock</div>
+        <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Zihin Sporları</h1>
+        <p style={{ color: PALETTE.dim, fontSize: 13, marginTop: 8, maxWidth: 280 }}>Her biri 30 saniyeden az sürüyor. Bir tane dene.</p>
+      </div>
+
+      <GameCard icon={<RingIcon />} title="İç Saat" subtitle="Zamanı hisset" stat={icAvg}
+        onClick={() => selectGame("innerclock")} />
+      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 18, fontWeight: 700 }}>#</span>} title="Sayı Hafızası" subtitle="Kaç basamak hatırlarsın?" stat={memoryBest}
+        onClick={() => selectGame("memory")} />
+      <GameCard icon={<BoltIcon />} title="Reaksiyon" subtitle="Ne kadar hızlısın?" stat={reactionBest}
+        onClick={() => selectGame("reaction")} />
+      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 16 }}>●●●</span>} title="Hızlı Sayım" subtitle="Göz kararı ne kadar keskin?" stat={countBest}
+        onClick={() => selectGame("count")} />
+      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 14, fontWeight: 700 }}>Aa</span>} title="Renk Tuzağı" subtitle="Zihnin renge mi kelimeye mi kanıyor?" stat={stroopBest}
+        onClick={() => selectGame("stroop")} />
+
+      <button type="button" onClick={() => selectGame("feedback")}
+        style={{
+          marginTop: 20, background: "none", border: "none", color: PALETTE.dim,
+          fontSize: 13, padding: "8px 4px", cursor: "pointer", textDecoration: "underline",
+          textUnderlineOffset: "3px",
+        }}>
+        Bir fikrin mi var? Bize yaz
+      </button>
+    </Shell>
+  );
+}
+
+/* ---------------- İÇ SAAT (mevcut oyun, prop tabanlı) ---------------- */
+
 const MODES = [
   { id: "kisa", label: "Kısa", seconds: 10 },
   { id: "orta", label: "Orta", seconds: 30 },
@@ -30,42 +184,32 @@ const MODES = [
 ];
 
 function accuracyLabel(pct) {
-  if (pct >= 97) return { text: "Mükemmel", color: "#8FB89A" };
-  if (pct >= 90) return { text: "Çok iyi", color: "#C9B37E" };
-  if (pct >= 75) return { text: "Fena değil", color: "#D9A05B" };
-  return { text: "Zihnin başka yerdeydi", color: "#C9705E" };
+  if (pct >= 97) return { text: "Mükemmel", color: PALETTE.good };
+  if (pct >= 90) return { text: "Çok iyi", color: PALETTE.mid };
+  if (pct >= 75) return { text: "Fena değil", color: PALETTE.amber };
+  return { text: "Zihnin başka yerdeydi", color: PALETTE.bad };
 }
 
 const AD_SECONDS = 5;
 
-function TimePerceptionGame() {
+function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStreak }) {
   const [modeIndex, setModeIndex] = useState(1);
   const [customSeconds, setCustomSeconds] = useState(null);
   const [customInput, setCustomInput] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [streak, setStreak] = useState(0);
   const [glow, setGlow] = useState(0);
   const [adSecondsLeft, setAdSecondsLeft] = useState(AD_SECONDS);
-  const [roundsPlayed, setRoundsPlayed] = useState(0);
 
   const startTimeRef = useRef(0);
   const rafRef = useRef(null);
   const adIntervalRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [shareImage, setShareImage] = useState(null);
-  const [sharing, setSharing] = useState(false);
-  const mode = customSeconds
-    ? { id: "custom", label: "Manuel", seconds: customSeconds }
-    : MODES[modeIndex];
+  const mode = customSeconds ? { id: "custom", label: "Manuel", seconds: customSeconds } : MODES[modeIndex];
 
-  useEffect(() => {
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      if (adIntervalRef.current) clearInterval(adIntervalRef.current);
-    };
+  useEffect(() => () => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (adIntervalRef.current) clearInterval(adIntervalRef.current);
   }, []);
 
   function handleStart() {
@@ -87,135 +231,31 @@ function TimePerceptionGame() {
     const diffMs = Math.abs(elapsedMs - targetMs);
     const pct = Math.max(0, 100 - (diffMs / targetMs) * 100);
     const entry = { mode: mode.label, guessMs: elapsedMs, targetMs, pct, id: Date.now() };
-    setHistory((prev) => [entry, ...prev].slice(0, 6));
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
     setStreak((prev) => (pct >= 90 ? prev + 1 : 0));
     setResult(entry);
     setPhase("result");
+    trackEvent("game_round_complete", { game: "innerclock", mode: mode.label, pct: Math.round(pct) });
   }
 
   function handleReset() {
-    setRoundsPlayed((r) => r + 1);
     setPhase("ad");
     setAdSecondsLeft(AD_SECONDS);
     adIntervalRef.current = setInterval(() => {
       setAdSecondsLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(adIntervalRef.current);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(adIntervalRef.current); return 0; }
         return prev - 1;
       });
     }, 1000);
   }
 
-  function skipAd() {
-    if (adIntervalRef.current) clearInterval(adIntervalRef.current);
-    setPhase("idle");
-    setResult(null);
-  }
-
-  function selectPreset(i) {
-    setModeIndex(i);
-    setCustomSeconds(null);
-    setShowCustomInput(false);
-  }
-
-  function openCustomInput() {
-    setShowCustomInput(true);
-    setCustomInput(customSeconds ? String(customSeconds) : "");
-  }
-
+  function skipAd() { if (adIntervalRef.current) clearInterval(adIntervalRef.current); setPhase("idle"); setResult(null); }
+  function selectPreset(i) { setModeIndex(i); setCustomSeconds(null); setShowCustomInput(false); }
+  function openCustomInput() { setShowCustomInput(true); setCustomInput(customSeconds ? String(customSeconds) : ""); }
   function confirmCustomSeconds() {
     const val = parseInt(customInput, 10);
-    if (!isNaN(val) && val > 0 && val <= 3600) {
-      setCustomSeconds(val);
-      setShowCustomInput(false);
-    }
+    if (!isNaN(val) && val > 0 && val <= 3600) { setCustomSeconds(val); setShowCustomInput(false); }
   }
-
-  function drawArcIcon(ctx, cx, cy, r) {
-    const grad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-    grad.addColorStop(0, "#E8B36B");
-    grad.addColorStop(1, "#C9863F");
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * 300) / 360);
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = r * 0.1;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - r * 0.35);
-    ctx.lineTo(cx, cy + r * 0.35);
-    ctx.strokeStyle = "#EDE7DA";
-    ctx.lineWidth = r * 0.115;
-    ctx.lineCap = "round";
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  async function shareResult() {
-    if (!result || !acc) return;
-    setSharing(true);
-    try {
-      const canvas = canvasRef.current || document.createElement("canvas");
-      canvasRef.current = canvas;
-      const W = 1080, H = 1920;
-      canvas.width = W;
-      canvas.height = H;
-      const ctx = canvas.getContext("2d");
-      const bgGrad = ctx.createRadialGradient(W / 2, H * 0.32, 100, W / 2, H * 0.32, H * 0.8);
-      bgGrad.addColorStop(0, "#161D2E");
-      bgGrad.addColorStop(1, "#080A11");
-      ctx.fillStyle = bgGrad;
-      ctx.fillRect(0, 0, W, H);
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#6B7185";
-      ctx.font = "600 28px -apple-system, sans-serif";
-      ctx.fillText("İÇ SAAT", W / 2, 320);
-      drawArcIcon(ctx, W / 2, 620, 220);
-      ctx.fillStyle = "#EDE7DA";
-      ctx.font = "700 140px -apple-system, sans-serif";
-      ctx.fillText(`${result.pct.toFixed(0)}%`, W / 2, 1120);
-      ctx.fillStyle = acc.color;
-      ctx.font = "600 52px -apple-system, sans-serif";
-      ctx.fillText(acc.text, W / 2, 1210);
-      ctx.fillStyle = "#6B7185";
-      ctx.font = "400 36px -apple-system, sans-serif";
-      ctx.fillText(
-        `${mode.label} mod - ${(result.guessMs / 1000).toFixed(2)}sn / ${mode.seconds}sn hedef`,
-        W / 2, 1290
-      );
-      if (streak > 0) {
-        ctx.fillStyle = "#D9A05B";
-        ctx.font = "600 40px -apple-system, sans-serif";
-        ctx.fillText(`${streak} gun seri`, W / 2, 1370);
-      }
-      ctx.fillStyle = "#4A5063";
-      ctx.font = "500 34px -apple-system, sans-serif";
-      ctx.fillText("Innerclock", W / 2, H - 140);
-      const dataUrl = canvas.toDataURL("image/png");
-      setShareImage(dataUrl);
-      if (navigator.share) {
-        try {
-          const blob = await (await fetch(dataUrl)).blob();
-          const file = new File([blob], "innerclock-sonuc.png", { type: "image/png" });
-          if (!navigator.canShare || navigator.canShare({ files: [file] })) {
-            await navigator.share({ files: [file], title: "Innerclock" });
-          }
-        } catch (shareErr) {}
-      }
-    } catch (err) {
-      console.error("Paylaşım kartı oluşturulamadı:", err);
-    } finally {
-      setSharing(false);
-    }
-  }
-
-  function closeShareCard() {
-    setShareImage(null);
-  }
-
   function handleCircleClick() {
     if (phase === "idle") handleStart();
     else if (phase === "counting") handleStop();
@@ -223,37 +263,20 @@ function TimePerceptionGame() {
   }
 
   const acc = result ? accuracyLabel(result.pct) : null;
-  const avgPct = history.length > 0 ? history.reduce((s, h) => s + h.pct, 0) / history.length : null;
 
   return (
-    <>
-    <div style={{
-      minHeight: "100vh", width: "100%",
-      background: "radial-gradient(circle at 50% 30%, #14192A 0%, #0A0D16 70%)",
-      color: "#C7CCDA", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "32px 20px 48px", boxSizing: "border-box",
-    }}>
-      <style>{`
-        @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
-        .mono { font-variant-numeric: tabular-nums; }
-      `}</style>
+    <Shell>
+      <TopBar title="İç Saat" onBack={onBack} onReport={onReport} />
 
-      <div style={{ textAlign: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: "#6B7185", marginBottom: 8 }}>İç Saat</div>
-        <h1 style={{ fontWeight: 600, fontSize: 24, color: "#EDE7DA", margin: 0 }}>Zamanı ne kadar iyi hissediyorsun?</h1>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, margin: "24px 0 8px", flexWrap: "wrap", justifyContent: "center" }}>
+      <div style={{ display: "flex", gap: 8, margin: "4px 0 8px", flexWrap: "wrap", justifyContent: "center" }}>
         {MODES.map((m, i) => (
           <button key={m.id} type="button" disabled={phase === "counting"} onClick={() => selectPreset(i)}
             style={{
               padding: "8px 16px", borderRadius: 999,
-              border: `1px solid ${!customSeconds && modeIndex === i ? "#D9A05B" : "#2A3040"}`,
-              background: !customSeconds && modeIndex === i ? "rgba(217,160,91,0.12)" : "transparent",
-              color: !customSeconds && modeIndex === i ? "#EDE7DA" : "#8B93A7",
-              fontSize: 13, cursor: phase === "counting" ? "default" : "pointer",
-              opacity: phase === "counting" ? 0.5 : 1,
+              border: `1px solid ${!customSeconds && modeIndex === i ? PALETTE.amber : PALETTE.border}`,
+              background: !customSeconds && modeIndex === i ? PALETTE.amberSoft : "transparent",
+              color: !customSeconds && modeIndex === i ? PALETTE.bright : "#8B93A7",
+              fontSize: 13, cursor: phase === "counting" ? "default" : "pointer", opacity: phase === "counting" ? 0.5 : 1,
             }}>
             {m.label} · {m.seconds >= 60 ? `${m.seconds / 60}dk` : `${m.seconds}sn`}
           </button>
@@ -261,11 +284,10 @@ function TimePerceptionGame() {
         <button type="button" disabled={phase === "counting"} onClick={openCustomInput}
           style={{
             padding: "8px 16px", borderRadius: 999,
-            border: `1px solid ${customSeconds ? "#D9A05B" : "#2A3040"}`,
-            background: customSeconds ? "rgba(217,160,91,0.12)" : "transparent",
-            color: customSeconds ? "#EDE7DA" : "#8B93A7",
-            fontSize: 13, cursor: phase === "counting" ? "default" : "pointer",
-            opacity: phase === "counting" ? 0.5 : 1,
+            border: `1px solid ${customSeconds ? PALETTE.amber : PALETTE.border}`,
+            background: customSeconds ? PALETTE.amberSoft : "transparent",
+            color: customSeconds ? PALETTE.bright : "#8B93A7",
+            fontSize: 13, cursor: phase === "counting" ? "default" : "pointer", opacity: phase === "counting" ? 0.5 : 1,
           }}>
           {customSeconds ? `Manuel · ${customSeconds}sn` : "Manuel ∞"}
         </button>
@@ -273,45 +295,41 @@ function TimePerceptionGame() {
 
       {showCustomInput && (
         <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "4px 0 8px" }}>
-          <input type="number" inputMode="numeric" min="1" max="3600" autoFocus
-            value={customInput} onChange={(e) => setCustomInput(e.target.value)}
+          <input type="number" inputMode="numeric" min="1" max="3600" autoFocus value={customInput}
+            onChange={(e) => setCustomInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && confirmCustomSeconds()}
             placeholder="saniye"
-            style={{ width: 90, padding: "8px 10px", borderRadius: 8, border: "1px solid #2A3040", background: "#12161F", color: "#EDE7DA", fontSize: 13, textAlign: "center" }} />
+            style={{ width: 90, padding: "8px 10px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "#12161F", color: PALETTE.bright, fontSize: 13, textAlign: "center" }} />
           <button type="button" onClick={confirmCustomSeconds}
-            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "rgba(217,160,91,0.2)", color: "#EDE7DA", fontSize: 13, cursor: "pointer" }}>
-            Tamam
-          </button>
+            style={{ padding: "8px 14px", borderRadius: 8, border: "none", background: "rgba(217,160,91,0.2)", color: PALETTE.bright, fontSize: 13, cursor: "pointer" }}>Tamam</button>
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 20, fontSize: 12, color: "#6B7185", margin: "8px 0 32px" }}>
-        <span>Seri: <span style={{ color: "#D9A05B", fontWeight: 600 }}>{streak}</span></span>
-        {avgPct !== null && (
-          <span>Ortalama: <span style={{ color: "#8FB89A", fontWeight: 600 }}>{avgPct.toFixed(1)}%</span></span>
-        )}
+      <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, margin: "8px 0 28px" }}>
+        <span>Seri: <span style={{ color: PALETTE.amber, fontWeight: 600 }}>{streak}</span></span>
+        <span>Turlar: <span style={{ color: PALETTE.good, fontWeight: 600 }}>{history.length}</span></span>
       </div>
 
       {phase === "ad" ? (
-        <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: "1px solid #2A3040", background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#4A5063", marginBottom: 14 }}>
+        <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`, background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
+          <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 14 }}>
             Reklam · {adSecondsLeft > 0 ? `${adSecondsLeft}sn` : "hazır"}
           </div>
           <div style={{ width: "100%", height: 140, borderRadius: 10, background: "repeating-linear-gradient(135deg, #232838, #232838 10px, #1C2130 10px, #1C2130 20px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6178", fontSize: 13, marginBottom: 18 }}>
             Örnek reklam alanı
           </div>
           <button type="button" onClick={skipAd} disabled={adSecondsLeft > 0}
-            style={{ padding: "10px 22px", borderRadius: 999, border: "1px solid #2A3040", background: adSecondsLeft > 0 ? "transparent" : "rgba(217,160,91,0.15)", color: adSecondsLeft > 0 ? "#4A5063" : "#EDE7DA", fontSize: 13, cursor: adSecondsLeft > 0 ? "default" : "pointer" }}>
+            style={{ padding: "10px 22px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: adSecondsLeft > 0 ? "transparent" : "rgba(217,160,91,0.15)", color: adSecondsLeft > 0 ? PALETTE.faint : PALETTE.bright, fontSize: 13, cursor: adSecondsLeft > 0 ? "default" : "pointer" }}>
             {adSecondsLeft > 0 ? `Geç (${adSecondsLeft})` : "Devam et"}
           </button>
         </div>
       ) : (
         <button type="button" onClick={handleCircleClick}
           style={{
-            position: "relative", width: 200, height: 200, borderRadius: "50%", border: "1px solid #262C3C",
+            position: "relative", width: 200, height: 200, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
             cursor: "pointer", padding: 0, marginBottom: 36,
             background: phase === "counting" ? `radial-gradient(circle, rgba(217,160,91,${0.25 + glow * 0.15}) 0%, #1A150F 70%)` : phase === "result" ? "radial-gradient(circle, #1B2A22 0%, #10160F 75%)" : "radial-gradient(circle, #1C2333 0%, #12161F 75%)",
-            color: "#EDE7DA", fontSize: phase === "result" ? 20 : 16, fontWeight: 500,
+            color: PALETTE.bright, fontSize: phase === "result" ? 20 : 16, fontWeight: 500,
             boxShadow: phase === "counting" ? "0 0 40px rgba(217,160,91,0.2)" : "0 4px 24px rgba(0,0,0,0.4)",
             animation: phase === "counting" ? "breathe 3.6s ease-in-out infinite" : "none",
           }}>
@@ -322,66 +340,834 @@ function TimePerceptionGame() {
       )}
 
       <div style={{ textAlign: "center", minHeight: 90, maxWidth: 320 }}>
-        {phase === "ad" && (
-          <p style={{ color: "#4A5063", fontSize: 13, lineHeight: 1.6, margin: 0 }}>Reklam bitince kaldığın yerden devam ediyorsun.</p>
-        )}
+        {phase === "ad" && <p style={{ color: PALETTE.faint, fontSize: 13, lineHeight: 1.6, margin: 0 }}>Reklam bitince kaldığın yerden devam ediyorsun.</p>}
         {phase === "idle" && (
-          <p style={{ color: "#6B7185", fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+          <p style={{ color: PALETTE.dim, fontSize: 14, lineHeight: 1.6, margin: 0 }}>
             Başla'ya bas, gözlerini kapat. Zihninde {mode.seconds >= 60 ? `${mode.seconds / 60} dakika` : `${mode.seconds} saniye`} geçtiğini hissettiğinde tekrar dokun.
           </p>
         )}
-        {phase === "counting" && (
-          <p style={{ color: "#4A5063", fontSize: 13, lineHeight: 1.6, margin: 0 }}>Gözlerin kapalı. Sayma, sadece hisset.</p>
-        )}
+        {phase === "counting" && <p style={{ color: PALETTE.faint, fontSize: 13, lineHeight: 1.6, margin: 0 }}>Gözlerin kapalı. Sayma, sadece hisset.</p>}
         {phase === "result" && result && acc && (
           <div>
-            <div className="mono" style={{ fontSize: 32, fontWeight: 600, color: "#EDE7DA", marginBottom: 4 }}>{(result.guessMs / 1000).toFixed(2)}sn</div>
-            <div style={{ fontSize: 12, color: "#6B7185", marginBottom: 10 }}>hedef {mode.seconds >= 60 ? `${mode.seconds / 60}dk` : `${mode.seconds}sn`}</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 16 }}>{acc.text} · {result.pct.toFixed(1)}%</div>
-            <button type="button" onClick={shareResult} disabled={sharing}
-              style={{ padding: "9px 20px", borderRadius: 999, border: "1px solid #2A3040", background: "rgba(217,160,91,0.1)", color: "#D9A05B", fontSize: 13, fontWeight: 600, cursor: sharing ? "default" : "pointer", opacity: sharing ? 0.6 : 1 }}>
-              {sharing ? "Hazırlanıyor…" : "Paylaş"}
-            </button>
+            <div className="mono" style={{ fontSize: 32, fontWeight: 600, color: PALETTE.bright, marginBottom: 4 }}>{(result.guessMs / 1000).toFixed(2)}sn</div>
+            <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>hedef {mode.seconds >= 60 ? `${mode.seconds / 60}dk` : `${mode.seconds}sn`}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: acc.color }}>{acc.text} · {result.pct.toFixed(1)}%</div>
           </div>
         )}
       </div>
+    </Shell>
+  );
+}
 
-      {history.length > 0 && (
-        <div style={{ marginTop: 40, width: "100%", maxWidth: 320 }}>
-          <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: "#4A5063", marginBottom: 10 }}>Son denemeler</div>
+/* ---------------- REAKSİYON ---------------- */
+
+function reactionLabel(ms) {
+  if (ms < 150) return { text: "İnsanüstü", color: PALETTE.good };
+  if (ms < 200) return { text: "Çok hızlı", color: PALETTE.good };
+  if (ms < 250) return { text: "Hızlı", color: PALETTE.mid };
+  if (ms < 320) return { text: "Ortalama", color: PALETTE.mid };
+  if (ms < 420) return { text: "Yavaş", color: PALETTE.amber };
+  return { text: "Çok yavaş", color: PALETTE.bad };
+}
+
+function formatMs(ms) {
+  return ms.toLocaleString("tr-TR");
+}
+
+function ReactionGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | waiting | ready | result | tooearly
+  const [lastMs, setLastMs] = useState(null);
+  const readyAtRef = useRef(0);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+
+  function startRound() {
+    setPhase("waiting");
+    const delay = 1200 + Math.random() * 2500;
+    timeoutRef.current = setTimeout(() => {
+      readyAtRef.current = Date.now();
+      setPhase("ready");
+    }, delay);
+  }
+
+  function handleTap() {
+    if (phase === "idle" || phase === "result" || phase === "tooearly") {
+      startRound();
+      return;
+    }
+    if (phase === "waiting") {
+      clearTimeout(timeoutRef.current);
+      setPhase("tooearly");
+      return;
+    }
+    if (phase === "ready") {
+      const ms = Date.now() - readyAtRef.current;
+      const entry = { ms, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      setLastMs(ms);
+      setPhase("result");
+      trackEvent("game_round_complete", { game: "reaction", ms });
+    }
+  }
+
+  const label = lastMs !== null ? reactionLabel(lastMs) : null;
+  const bg =
+    phase === "ready" ? "radial-gradient(circle, #2A4A32 0%, #10160F 75%)" :
+    phase === "waiting" ? "radial-gradient(circle, #2A1A1A 0%, #12161F 75%)" :
+    phase === "tooearly" ? "radial-gradient(circle, #3A2020 0%, #12161F 75%)" :
+    phase === "result" ? "radial-gradient(circle, #1B2A22 0%, #10160F 75%)" :
+    "radial-gradient(circle, #1C2333 0%, #12161F 75%)";
+
+  return (
+    <Shell>
+      <TopBar title="Reaksiyon" onBack={onBack} onReport={onReport} />
+
+      <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
+        Daireye dokun, bekle. Renk değiştiği an tekrar dokun — ne kadar erken, o kadar iyi.
+      </p>
+
+      <button type="button" onClick={handleTap}
+        style={{
+          width: 220, height: 220, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
+          cursor: "pointer", padding: 0, marginBottom: 32, background: bg,
+          color: PALETTE.bright, fontSize: 16, fontWeight: 500,
+          transition: "background 0.15s ease",
+        }}>
+        {phase === "idle" && "Dokun, başla"}
+        {phase === "waiting" && "Bekle…"}
+        {phase === "ready" && "ŞİMDİ!"}
+        {phase === "tooearly" && "Çok erken"}
+        {phase === "result" && "Tekrar"}
+      </button>
+
+      <div style={{ textAlign: "center", minHeight: 70, maxWidth: 300 }}>
+        {phase === "tooearly" && (
+          <p style={{ color: PALETTE.bad, fontSize: 13, lineHeight: 1.6, margin: 0 }}>Erken dokundun. Renk değişene kadar bekle.</p>
+        )}
+        {phase === "result" && lastMs !== null && label && (
+          <div>
+            <div className="mono" style={{ fontSize: 32, fontWeight: 600, color: PALETTE.bright, marginBottom: 4 }}>{formatMs(lastMs)}ms</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: label.color }}>{label.text}</div>
+          </div>
+        )}
+        {phase === "idle" && history.length > 0 && (
+          <p style={{ color: PALETTE.faint, fontSize: 12 }}>En iyi: {formatMs(Math.min(...history.map((h) => h.ms)))}ms</p>
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+/* ---------------- SAYI HAFIZASI ---------------- */
+
+function generateSequence(length) {
+  return Array.from({ length }, () => Math.floor(Math.random() * 10));
+}
+
+function MemoryGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | showing | input | wrong
+  const [length, setLength] = useState(3);
+  const [sequence, setSequence] = useState([]);
+  const [userInput, setUserInput] = useState("");
+  const [longestCorrect, setLongestCorrect] = useState(0);
+  const [lastCorrectFlash, setLastCorrectFlash] = useState(false);
+  const showTimeoutRef = useRef(null);
+
+  useEffect(() => () => { if (showTimeoutRef.current) clearTimeout(showTimeoutRef.current); }, []);
+
+  function startRound(nextLength) {
+    const seq = generateSequence(nextLength);
+    setSequence(seq);
+    setUserInput("");
+    setPhase("showing");
+    const displayMs = 700 + nextLength * 550;
+    showTimeoutRef.current = setTimeout(() => setPhase("input"), displayMs);
+  }
+
+  function handleStart() {
+    setLongestCorrect(0);
+    setLength(3);
+    startRound(3);
+  }
+
+  function pressDigit(d) {
+    if (phase !== "input") return;
+    const next = userInput + String(d);
+    setUserInput(next);
+    if (next.length === sequence.length) {
+      const match = next === sequence.join("");
+      if (match) {
+        setLongestCorrect(sequence.length);
+        setLastCorrectFlash(true);
+        const nextLen = length + 1;
+        setTimeout(() => {
+          setLastCorrectFlash(false);
+          setLength(nextLen);
+          startRound(nextLen);
+        }, 550);
+      } else {
+        const entry = { score: longestCorrect, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setPhase("wrong");
+        trackEvent("game_round_complete", { game: "memory", score: longestCorrect });
+      }
+    }
+  }
+
+  function backspace() {
+    if (phase !== "input") return;
+    setUserInput((prev) => prev.slice(0, -1));
+  }
+
+  function reset() {
+    setPhase("idle");
+  }
+
+  return (
+    <Shell>
+      <TopBar title="Sayı Hafızası" onBack={onBack} onReport={onReport} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
+            Kısaca gösterilen sayı dizisini ezberle, sonra aynısını gir. Her doğru turda dizi bir hane uzar.
+          </p>
+          <button type="button" onClick={handleStart}
+            style={{
+              width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
+              cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)",
+              color: PALETTE.bright, fontSize: 16, fontWeight: 500,
+            }}>Başla</button>
+          {history.length > 0 && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>
+              En uzun: {Math.max(...history.map((h) => h.score))} basamak
+            </p>
+          )}
+        </>
+      )}
+
+      {(phase === "showing" || phase === "input" || phase === "wrong") && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
+            {phase === "showing" ? "Ezberle" : phase === "wrong" ? "Yanlış" : "Şimdi gir"}
+          </div>
+          <div style={{
+            width: "100%", maxWidth: 320, minHeight: 90, borderRadius: 16,
+            border: `1px solid ${lastCorrectFlash ? PALETTE.good : phase === "wrong" ? PALETTE.bad : PALETTE.border}`,
+            display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 20,
+            background: lastCorrectFlash ? "rgba(143,184,154,0.08)" : phase === "wrong" ? "rgba(201,112,94,0.08)" : "rgba(255,255,255,0.02)",
+          }}>
+            <div className="mono" style={{
+              fontSize: 34, fontWeight: 700, letterSpacing: "0.15em",
+              color: phase === "wrong" ? PALETTE.bad : PALETTE.bright,
+            }}>
+              {phase === "showing" ? sequence.join(" ") : userInput.split("").join(" ") || "\u00A0"}
+            </div>
+          </div>
+
+          {phase === "wrong" && (
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div className="mono" style={{ fontSize: 20, color: PALETTE.dim, marginBottom: 6 }}>
+                Doğrusu: {sequence.join(" ")}
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.amber, marginBottom: 20 }}>
+                {longestCorrect} basamağa kadar hatırladın
+              </div>
+              <button type="button" onClick={reset}
+                style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+                Tekrar
+              </button>
+            </div>
+          )}
+
+          {phase === "input" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: "100%", maxWidth: 260 }}>
+              {[1,2,3,4,5,6,7,8,9].map((d) => (
+                <button key={d} type="button" onClick={() => pressDigit(d)}
+                  style={{ padding: "16px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 18, fontWeight: 600, cursor: "pointer" }}>
+                  {d}
+                </button>
+              ))}
+              <button type="button" onClick={backspace}
+                style={{ padding: "16px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 14, cursor: "pointer" }}>⌫</button>
+              <button key={0} type="button" onClick={() => pressDigit(0)}
+                style={{ padding: "16px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 18, fontWeight: 600, cursor: "pointer" }}>0</button>
+              <div />
+            </div>
+          )}
+        </>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- HIZLI SAYIM ---------------- */
+
+function generateDots(count) {
+  const dots = [];
+  let attempts = 0;
+  while (dots.length < count && attempts < count * 40) {
+    attempts++;
+    const x = 8 + Math.random() * 84;
+    const y = 8 + Math.random() * 84;
+    const tooClose = dots.some((d) => Math.hypot(d.x - x, d.y - y) < 11);
+    if (!tooClose) dots.push({ x, y });
+  }
+  return dots;
+}
+
+function CountGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | showing | guess | result
+  const [actual, setActual] = useState(0);
+  const [dots, setDots] = useState([]);
+  const [guessInput, setGuessInput] = useState("");
+  const [result, setResult] = useState(null);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+
+  function handleStart() {
+    const count = 6 + Math.floor(Math.random() * 16); // 6-21
+    setActual(count);
+    setDots(generateDots(count));
+    setGuessInput("");
+    setResult(null);
+    setPhase("showing");
+    timeoutRef.current = setTimeout(() => setPhase("guess"), 650);
+  }
+
+  function pressDigit(d) {
+    if (phase !== "guess") return;
+    if (guessInput.length >= 2) return;
+    setGuessInput((prev) => prev + String(d));
+  }
+  function backspace() {
+    if (phase !== "guess") return;
+    setGuessInput((prev) => prev.slice(0, -1));
+  }
+  function confirmGuess() {
+    const guess = parseInt(guessInput, 10);
+    if (isNaN(guess)) return;
+    const diff = Math.abs(guess - actual);
+    const pct = Math.max(0, 100 - (diff / actual) * 100);
+    const entry = { actual, guess, diff, pct, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    setResult(entry);
+    setPhase("result");
+    trackEvent("game_round_complete", { game: "count", pct: Math.round(pct) });
+  }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Hızlı Sayım" onBack={onBack} onReport={onReport} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
+            Noktalar çok kısa süreliğine görünecek. Kaç tane olduğunu tahmin et.
+          </p>
+          <button type="button" onClick={handleStart}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {history.length > 0 && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{Math.max(...history.map((h) => h.pct)).toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {(phase === "showing" || phase === "guess") && (
+        <>
+          <div style={{
+            position: "relative", width: 260, height: 260, borderRadius: 20,
+            border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.02)", marginBottom: 28,
+          }}>
+            {phase === "showing" && dots.map((d, i) => (
+              <div key={i} style={{
+                position: "absolute", left: `${d.x}%`, top: `${d.y}%`, width: 14, height: 14,
+                borderRadius: "50%", background: PALETTE.amber, transform: "translate(-50%, -50%)",
+              }} />
+            ))}
+            {phase === "guess" && (
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.faint, fontSize: 13 }}>
+                Kaç tane gördün?
+              </div>
+            )}
+          </div>
+
+          {phase === "guess" && (
+            <>
+              <div className="mono" style={{ fontSize: 28, fontWeight: 700, color: PALETTE.bright, marginBottom: 16, minHeight: 36 }}>
+                {guessInput || "\u00A0"}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: "100%", maxWidth: 260, marginBottom: 14 }}>
+                {[1,2,3,4,5,6,7,8,9].map((d) => (
+                  <button key={d} type="button" onClick={() => pressDigit(d)}
+                    style={{ padding: "14px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 17, fontWeight: 600, cursor: "pointer" }}>{d}</button>
+                ))}
+                <button type="button" onClick={backspace}
+                  style={{ padding: "14px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 14, cursor: "pointer" }}>⌫</button>
+                <button key={0} type="button" onClick={() => pressDigit(0)}
+                  style={{ padding: "14px 0", borderRadius: 12, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 17, fontWeight: 600, cursor: "pointer" }}>0</button>
+                <div />
+              </div>
+              <button type="button" onClick={confirmGuess} disabled={!guessInput}
+                style={{ padding: "10px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: guessInput ? PALETTE.amberSoft : "transparent", color: guessInput ? PALETTE.bright : PALETTE.faint, fontSize: 14, fontWeight: 600, cursor: guessInput ? "pointer" : "default" }}>
+                Onayla
+              </button>
+            </>
+          )}
+        </>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{result.guess}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>gerçek sayı: {result.actual}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text} · %{result.pct.toFixed(0)}</div>
+          <button type="button" onClick={handleStart}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- RENK TUZAĞI (Stroop) ---------------- */
+
+const STROOP_COLORS = [
+  { name: "KIRMIZI", hex: "#C9705E" },
+  { name: "MAVİ", hex: "#5E8FC9" },
+  { name: "YEŞİL", hex: "#7FA88C" },
+  { name: "SARI", hex: "#D9C25B" },
+];
+const TOTAL_TRIALS = 10;
+
+function pickTrial() {
+  const word = STROOP_COLORS[Math.floor(Math.random() * STROOP_COLORS.length)];
+  const ink = STROOP_COLORS[Math.floor(Math.random() * STROOP_COLORS.length)];
+  const options = [...STROOP_COLORS].sort(() => Math.random() - 0.5);
+  return { word: word.name, inkHex: ink.hex, inkName: ink.name, options, shownAt: Date.now() };
+}
+
+function StroopGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | result
+  const [trialIndex, setTrialIndex] = useState(0);
+  const [trial, setTrial] = useState(null);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [totalMs, setTotalMs] = useState(0);
+  const [flash, setFlash] = useState(null); // 'correct' | 'wrong' | null
+
+  function handleStart() {
+    setTrialIndex(0);
+    setCorrectCount(0);
+    setTotalMs(0);
+    setTrial(pickTrial());
+    setPhase("playing");
+  }
+
+  function answer(colorName) {
+    if (!trial || flash) return;
+    const ms = Date.now() - trial.shownAt;
+    const correct = colorName === trial.inkName;
+    setFlash(correct ? "correct" : "wrong");
+    setTotalMs((prev) => prev + ms);
+    if (correct) setCorrectCount((prev) => prev + 1);
+
+    setTimeout(() => {
+      setFlash(null);
+      const next = trialIndex + 1;
+      if (next >= TOTAL_TRIALS) {
+        const accuracyPct = ((correct ? correctCount + 1 : correctCount) / TOTAL_TRIALS) * 100;
+        const avgMs = Math.round((totalMs + ms) / TOTAL_TRIALS);
+        const entry = { accuracyPct, avgMs, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setPhase("result");
+        trackEvent("game_round_complete", { game: "stroop", accuracyPct: Math.round(accuracyPct), avgMs });
+      } else {
+        setTrialIndex(next);
+        setTrial(pickTrial());
+      }
+    }, 280);
+  }
+
+  const finalAccuracy = history.length && phase === "result" ? history[0].accuracyPct : null;
+  const finalAvgMs = history.length && phase === "result" ? history[0].avgMs : null;
+
+  return (
+    <Shell>
+      <TopBar title="Renk Tuzağı" onBack={onBack} onReport={onReport} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 28 }}>
+            Kelimeyi değil, yazının rengini seç. {TOTAL_TRIALS} tur, zihnin seni yanıltmaya çalışacak.
+          </p>
+          <button type="button" onClick={handleStart}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {history.length > 0 && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{Math.max(...history.map((h) => h.accuracyPct)).toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "playing" && trial && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 6 }}>{trialIndex + 1} / {TOTAL_TRIALS}</div>
+          <div style={{
+            width: "100%", maxWidth: 300, minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 28, borderRadius: 16, border: `1px solid ${flash === "correct" ? PALETTE.good : flash === "wrong" ? PALETTE.bad : PALETTE.border}`,
+            background: "rgba(255,255,255,0.02)",
+          }}>
+            <div style={{ fontSize: 40, fontWeight: 800, color: trial.inkHex, letterSpacing: "0.05em" }}>{trial.word}</div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, width: "100%", maxWidth: 280 }}>
+            {trial.options.map((c) => (
+              <button key={c.name} type="button" onClick={() => answer(c.name)}
+                style={{
+                  padding: "18px 0", borderRadius: 14, border: "none", cursor: "pointer",
+                  background: c.hex, color: "#0A0D16", fontSize: 14, fontWeight: 700,
+                }}>{c.name}</button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{finalAccuracy ? finalAccuracy.toFixed(0) : 0}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>doğruluk · ortalama {finalAvgMs ? formatMs(finalAvgMs) : 0}ms</div>
+          <button type="button" onClick={handleStart}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- ÖNERİ / GERİ BİLDİRİM ---------------- */
+
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xaqrwgrl";
+
+function FeedbackForm({ onBack }) {
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+
+  async function handleSubmit() {
+    if (!message.trim()) return;
+    setStatus("sending");
+    try {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ message }),
+      });
+      if (res.ok) {
+        setStatus("sent");
+        trackEvent("feedback_sent", {});
+      } else {
+        setStatus("error");
+      }
+    } catch (e) {
+      setStatus("error");
+    }
+  }
+
+  return (
+    <Shell>
+      <div style={{ width: "100%", maxWidth: 340, display: "flex", alignItems: "center", marginBottom: 24 }}>
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: PALETTE.dim, fontSize: 14, padding: "6px 4px", cursor: "pointer" }}>‹ Geri</button>
+      </div>
+
+      <div style={{ fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Öneri Gönder</div>
+
+      {status === "sent" ? (
+        <div style={{ textAlign: "center", marginTop: 20 }}>
+          <div style={{ fontSize: 40, marginBottom: 12 }}>✓</div>
+          <p style={{ color: PALETTE.bright, fontSize: 15, marginBottom: 20 }}>Teşekkürler, mesajın ulaştı.</p>
+          <button type="button" onClick={onBack}
+            style={{ padding: "10px 22px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 13, cursor: "pointer" }}>
+            Oyunlara dön
+          </button>
+        </div>
+      ) : (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, margin: "8px 0 20px" }}>
+            Yeni bir oyun fikrin, bir hata bildirimi ya da genel bir yorumun mu var? Yazabilirsin.
+          </p>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Fikrini buraya yaz…"
+            rows={6}
+            style={{
+              width: "100%", maxWidth: 320, borderRadius: 14, border: `1px solid ${PALETTE.border}`,
+              background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 14,
+              padding: "14px 16px", fontFamily: "inherit", resize: "vertical", marginBottom: 16,
+              boxSizing: "border-box",
+            }}
+          />
+          {status === "error" && (
+            <p style={{ color: PALETTE.bad, fontSize: 12, marginBottom: 12 }}>Gönderilemedi, tekrar dener misin?</p>
+          )}
+          <button type="button" onClick={handleSubmit} disabled={status === "sending" || !message.trim()}
+            style={{
+              padding: "12px 28px", borderRadius: 999, border: `1px solid ${PALETTE.border}`,
+              background: message.trim() ? PALETTE.amberSoft : "transparent",
+              color: message.trim() ? PALETTE.bright : PALETTE.faint,
+              fontSize: 14, fontWeight: 600, cursor: message.trim() ? "pointer" : "default",
+              opacity: status === "sending" ? 0.6 : 1,
+            }}>
+            {status === "sending" ? "Gönderiliyor…" : "Gönder"}
+          </button>
+        </>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- RAPOR ---------------- */
+
+function innerclockMessage(history) {
+  if (history.length === 0) return "Henüz hiç tur oynamadın. İlk turunla başla, sana burada ne kadar keskin olduğunu göstereceğiz.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 95) return `Zaman senin içinde akıyor gibi. Ortalama %${avg.toFixed(0)} doğrulukla neredeyse kusursuz bir ritmin var — bu seviyeye gelen çok az kişi var.`;
+  if (avg >= 85) return `Çok iyi bir iç saatin var. Ortalama %${avg.toFixed(0)} doğruluk, ustalığa oldukça yakınsın. En iyi turun %${best.toFixed(0)} — o hissi yakalayan sensin, tekrar yakalayabilirsin.`;
+  if (avg >= 70) return `Fena değil — ortalama %${avg.toFixed(0)}. Zaman algısı pratikle keskinleşen bir kas gibi, her tur seni biraz daha geliştiriyor.`;
+  return `Henüz ısınma turlarındasın (%${avg.toFixed(0)} ortalama), ve bu tamamen normal. Birkaç tur daha dene, iç saatin kendini bulacak.`;
+}
+
+function reactionMessage(history) {
+  if (history.length === 0) return "Henüz hiç tur oynamadın. İlk dokunuşunla refleks hızını ölçmeye başla.";
+  const avg = history.reduce((s, h) => s + h.ms, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.ms));
+  if (avg <= 200) return `Refleksin gerçekten üst düzey — ortalama ${formatMs(Math.round(avg))}ms. Bu, birçok profesyonel oyuncunun tepki süresine yakın.`;
+  if (avg <= 260) return `Ortalama insanın oldukça üzerinde bir reflekse sahipsin — ${formatMs(Math.round(avg))}ms ortalama, en iyi turun ${formatMs(best)}ms. Sağlam bir performans.`;
+  if (avg <= 340) return `Sağlam bir refleks hızın var, ortalama ${formatMs(Math.round(avg))}ms. Daha fazla tekrarla bu süre kısalabilir.`;
+  return `Ortalama ${formatMs(Math.round(avg))}ms — refleks kasların ısınıyor. Kısa aralıklarla birkaç tur daha denersen fark hemen görünür.`;
+}
+
+function memoryMessage(history) {
+  if (history.length === 0) return "Henüz hiç tur oynamadın. İlk denemende kaç basamağa kadar hatırlayabildiğini görelim.";
+  const best = Math.max(...history.map((h) => h.score));
+  const avg = history.reduce((s, h) => s + h.score, 0) / history.length;
+  if (best >= 9) return `${best} basamağa kadar çıkmışsın — bu, ortalama insan hafıza kapasitesinin oldukça üzerinde. Etkileyici bir çalışma belleği.`;
+  if (best >= 7) return `En iyi turun ${best} basamak. Yetişkinlerin çoğu 7 civarında takılır, sen bu sınırın yakınında ya da üzerindesin.`;
+  if (best >= 5) return `En iyi turun ${best} basamak, ortalaman ${avg.toFixed(1)}. Sağlam bir başlangıç, tekrar ettikçe bu sayı büyür.`;
+  return `Henüz ısınıyorsun (${best} basamak). Çalışma belleği pratikle gelişen bir yetenek — birkaç tur daha dene.`;
+}
+
+function countMessage(history) {
+  if (history.length === 0) return "Henüz hiç tur oynamadın. Noktalar bir anlığına görünecek, göz kararı yeteneğini test edelim.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 90) return `Göz kararın gerçekten keskin — ortalama %${avg.toFixed(0)} doğruluk. Bu seviye, hızlı görsel tahmin konusunda üst düzey bir yetenek gösteriyor.`;
+  if (avg >= 75) return `İyi bir göz kararın var, ortalama %${avg.toFixed(0)}. En iyi turun %${best.toFixed(0)} — o anki odağını yakaladığında fark ediliyor.`;
+  if (avg >= 55) return `Ortalama %${avg.toFixed(0)} doğrulukla fena değil. Gözün kalabalık sahneleri hızlı taramaya alışıyor.`;
+  return `Henüz %${avg.toFixed(0)} ortalamadasın, bu normal — göz kararı da tıpkı diğerleri gibi pratikle keskinleşiyor.`;
+}
+
+function stroopMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Zihninin kelimeye mi renge mi öncelik verdiğini birlikte görelim.";
+  const avgAcc = history.reduce((s, h) => s + h.accuracyPct, 0) / history.length;
+  const avgMs = history.reduce((s, h) => s + h.avgMs, 0) / history.length;
+  const bestAcc = Math.max(...history.map((h) => h.accuracyPct));
+  if (avgAcc >= 90 && avgMs <= 900) return `Hem hızlı hem isabetli — ortalama %${avgAcc.toFixed(0)} doğruluk, ${formatMs(Math.round(avgMs))}ms tepki. Zihnin çelişkili bilgiyi görmezden gelmekte çok başarılı.`;
+  if (avgAcc >= 80) return `Ortalama %${avgAcc.toFixed(0)} doğruluk gayet iyi. En iyi turun %${bestAcc.toFixed(0)} — kelimenin çekimine kapılmadan rengi görebiliyorsun.`;
+  if (avgAcc >= 60) return `Ortalama %${avgAcc.toFixed(0)} doğrulukla makul bir performans. Kelime ile renk çakıştığında zihnin biraz yavaşlıyor, bu aslında herkeste olan bir şey.`;
+  return `Ortalama %${avgAcc.toFixed(0)} — kelimenin anlamı rengi geçici olarak bastırıyor. Bu test genelde ilk denemelerde zorlayıcıdır, tekrar ettikçe kolaylaşır.`;
+}
+
+function Report({ type, history, onBack }) {
+  const titles = {
+    innerclock: "İç Saat Raporu",
+    reaction: "Reaksiyon Raporu",
+    memory: "Sayı Hafızası Raporu",
+    count: "Hızlı Sayım Raporu",
+    stroop: "Renk Tuzağı Raporu",
+  };
+  const title = titles[type];
+  const messageFns = {
+    innerclock: innerclockMessage,
+    reaction: reactionMessage,
+    memory: memoryMessage,
+    count: countMessage,
+    stroop: stroopMessage,
+  };
+  const message = messageFns[type](history);
+  const count = history.length;
+
+  let best = null, avg = null;
+  if (count > 0) {
+    if (type === "innerclock") {
+      best = Math.max(...history.map((h) => h.pct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.pct, 0) / count).toFixed(1) + "%";
+    } else if (type === "reaction") {
+      best = formatMs(Math.min(...history.map((h) => h.ms))) + "ms";
+      avg = formatMs(Math.round(history.reduce((s, h) => s + h.ms, 0) / count)) + "ms";
+    } else if (type === "memory") {
+      best = Math.max(...history.map((h) => h.score));
+      avg = (history.reduce((s, h) => s + h.score, 0) / count).toFixed(1);
+    } else if (type === "count") {
+      best = Math.max(...history.map((h) => h.pct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.pct, 0) / count).toFixed(0) + "%";
+    } else if (type === "stroop") {
+      best = Math.max(...history.map((h) => h.accuracyPct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.accuracyPct, 0) / count).toFixed(0) + "%";
+    }
+  }
+
+  return (
+    <Shell>
+      <div style={{ width: "100%", maxWidth: 340, display: "flex", alignItems: "center", marginBottom: 24 }}>
+        <button type="button" onClick={onBack} style={{ background: "none", border: "none", color: PALETTE.dim, fontSize: 14, padding: "6px 4px", cursor: "pointer" }}>‹ Geri</button>
+      </div>
+
+      <div style={{ fontSize: 12, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>{title}</div>
+
+      <div style={{ display: "flex", gap: 28, margin: "16px 0 28px" }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: PALETTE.bright }}>{count}</div>
+          <div style={{ fontSize: 11, color: PALETTE.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>Tur</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: PALETTE.amber }}>{best !== null ? best : "—"}</div>
+          <div style={{ fontSize: 11, color: PALETTE.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>En iyi</div>
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: PALETTE.good }}>{avg !== null ? avg : "—"}</div>
+          <div style={{ fontSize: 11, color: PALETTE.dim, textTransform: "uppercase", letterSpacing: "0.08em" }}>Ortalama</div>
+        </div>
+      </div>
+
+      <div style={{
+        width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`,
+        background: "rgba(217,160,91,0.05)", padding: "20px 20px", marginBottom: 28,
+      }}>
+        <p style={{ color: PALETTE.bright, fontSize: 14, lineHeight: 1.7, margin: 0 }}>{message}</p>
+      </div>
+
+      {count > 0 && (
+        <div style={{ width: "100%", maxWidth: 320 }}>
+          <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 10 }}>Son turlar</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            {history.map((h) => (
-              <div key={h.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#6B7185", padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
-                <span>{h.mode}</span>
-                <span className="mono">{(h.guessMs / 1000).toFixed(2)}sn</span>
-                <span style={{ color: accuracyLabel(h.pct).color }}>{h.pct.toFixed(0)}%</span>
+            {history.slice(0, 8).map((h) => (
+              <div key={h.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: PALETTE.dim, padding: "6px 10px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+                {type === "innerclock" && (
+                  <>
+                    <span>{h.mode}</span>
+                    <span className="mono">{(h.guessMs / 1000).toFixed(2)}sn</span>
+                    <span style={{ color: accuracyLabel(h.pct).color }}>{h.pct.toFixed(0)}%</span>
+                  </>
+                )}
+                {type === "reaction" && (
+                  <>
+                    <span className="mono">{formatMs(h.ms)}ms</span>
+                    <span style={{ color: reactionLabel(h.ms).color }}>{reactionLabel(h.ms).text}</span>
+                  </>
+                )}
+                {type === "memory" && (
+                  <>
+                    <span>Tur</span>
+                    <span className="mono">{h.score} basamak</span>
+                  </>
+                )}
+                {type === "count" && (
+                  <>
+                    <span>{h.guess} / gerçek {h.actual}</span>
+                    <span style={{ color: accuracyLabel(h.pct).color }}>{h.pct.toFixed(0)}%</span>
+                  </>
+                )}
+                {type === "stroop" && (
+                  <>
+                    <span className="mono">{formatMs(h.avgMs)}ms ort.</span>
+                    <span style={{ color: accuracyLabel(h.accuracyPct).color }}>{h.accuracyPct.toFixed(0)}%</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
-    </div>
+    </Shell>
+  );
+}
 
-    {shareImage && (
-      <div onClick={closeShareCard}
-        style={{ position: "fixed", inset: 0, background: "rgba(5,6,10,0.85)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 50 }}>
-        <img src={shareImage} alt="Innerclock sonuç kartı" onClick={(e) => e.stopPropagation()}
-          style={{ width: "100%", maxWidth: 260, borderRadius: 16, boxShadow: "0 20px 60px rgba(0,0,0,0.5)", marginBottom: 12 }} />
-        <p style={{ color: "#6B7185", fontSize: 12, textAlign: "center", maxWidth: 260, margin: "0 0 16px", lineHeight: 1.5 }}>
-          Görsele uzun basıp "Resmi Kaydet" ile galerine ekleyebilirsin.
-        </p>
-        <button type="button" onClick={closeShareCard}
-          style={{ padding: "10px 22px", borderRadius: 999, border: "1px solid #2A3040", background: "rgba(217,160,91,0.1)", color: "#EDE7DA", fontSize: 13, cursor: "pointer" }}>
-          Kapat
-        </button>
-      </div>
-    )}
+/* ---------------- APP ---------------- */
+
+function App() {
+  const [view, setView] = useState("home");
+  const [icHistory, setIcHistory] = useState([]);
+  const [icStreak, setIcStreak] = useState(0);
+  const [reactionHistory, setReactionHistory] = useState([]);
+  const [memoryHistory, setMemoryHistory] = useState([]);
+  const [countHistory, setCountHistory] = useState([]);
+  const [stroopHistory, setStroopHistory] = useState([]);
+
+  return (
+    <>
+      {view === "home" && (
+        <Home
+          onSelect={setView}
+          icHistory={icHistory} reactionHistory={reactionHistory}
+          memoryHistory={memoryHistory} countHistory={countHistory} stroopHistory={stroopHistory}
+        />
+      )}
+      {view === "innerclock" && (
+        <InnerclockGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-innerclock")}
+          history={icHistory} setHistory={setIcHistory}
+          streak={icStreak} setStreak={setIcStreak}
+        />
+      )}
+      {view === "reaction" && (
+        <ReactionGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-reaction")}
+          history={reactionHistory} setHistory={setReactionHistory}
+        />
+      )}
+      {view === "memory" && (
+        <MemoryGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-memory")}
+          history={memoryHistory} setHistory={setMemoryHistory}
+        />
+      )}
+      {view === "count" && (
+        <CountGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-count")}
+          history={countHistory} setHistory={setCountHistory}
+        />
+      )}
+      {view === "stroop" && (
+        <StroopGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-stroop")}
+          history={stroopHistory} setHistory={setStroopHistory}
+        />
+      )}
+      {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
+      {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
+      {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
+      {view === "report-memory" && <Report type="memory" history={memoryHistory} onBack={() => setView("memory")} />}
+      {view === "report-count" && <Report type="count" history={countHistory} onBack={() => setView("count")} />}
+      {view === "report-stroop" && <Report type="stroop" history={stroopHistory} onBack={() => setView("stroop")} />}
     </>
   );
 }
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
-root.render(<TimePerceptionGame />);
+root.render(<App />);
 </script>
 </body>
 </html>
