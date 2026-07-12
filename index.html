@@ -61,7 +61,8 @@ function Shell({ children }) {
       minHeight: "100vh", width: "100%", background: PALETTE.bg, color: PALETTE.text,
       fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
       display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "32px 20px 48px", boxSizing: "border-box",
+      padding: "calc(32px + env(safe-area-inset-top, 0px)) 20px calc(48px + env(safe-area-inset-bottom, 0px))",
+      boxSizing: "border-box",
     }}>
       <style>{`
         @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
@@ -82,6 +83,36 @@ function TopBar({ title, onBack, onReport }) {
       <button type="button" onClick={onReport} style={{
         background: "none", border: "none", color: PALETTE.amber, fontSize: 13, fontWeight: 600, padding: "6px 4px", cursor: "pointer",
       }}>Rapor</button>
+    </div>
+  );
+}
+
+const AD_SECONDS = 5;
+
+function AdScreen({ onDone }) {
+  const [secondsLeft, setSecondsLeft] = useState(AD_SECONDS);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) { clearInterval(interval); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`, background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
+      <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 14 }}>
+        Reklam · {secondsLeft > 0 ? `${secondsLeft}sn` : "hazır"}
+      </div>
+      <div style={{ width: "100%", height: 140, borderRadius: 10, background: "repeating-linear-gradient(135deg, #232838, #232838 10px, #1C2130 10px, #1C2130 20px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6178", fontSize: 13, marginBottom: 18 }}>
+        Örnek reklam alanı
+      </div>
+      <button type="button" onClick={onDone} disabled={secondsLeft > 0}
+        style={{ padding: "10px 22px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: secondsLeft > 0 ? "transparent" : "rgba(217,160,91,0.15)", color: secondsLeft > 0 ? PALETTE.faint : PALETTE.bright, fontSize: 13, cursor: secondsLeft > 0 ? "default" : "pointer" }}>
+        {secondsLeft > 0 ? `Geç (${secondsLeft})` : "Devam et"}
+      </button>
     </div>
   );
 }
@@ -131,12 +162,13 @@ function GameCard({ icon, title, subtitle, stat, onClick, disabled }) {
   );
 }
 
-function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory }) {
+function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, sudokuHistory }) {
   const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
   const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
   const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
   const countBest = countHistory.length ? Math.max(...countHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
   const stroopBest = stroopHistory.length ? Math.max(...stroopHistory.map((h) => h.accuracyPct)).toFixed(0) + "%" : null;
+  const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -161,6 +193,8 @@ function Home({ onSelect, icHistory, reactionHistory, memoryHistory, countHistor
         onClick={() => selectGame("count")} />
       <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 14, fontWeight: 700 }}>Aa</span>} title="Renk Tuzağı" subtitle="Zihnin renge mi kelimeye mi kanıyor?" stat={stroopBest}
         onClick={() => selectGame("stroop")} />
+      <GameCard icon={<span style={{ color: PALETTE.amber, fontSize: 18 }}>⊞</span>} title="Sudoku" subtitle="Klasik mantık bulmacası" stat={sudokuBest}
+        onClick={() => selectGame("sudoku")} />
 
       <button type="button" onClick={() => selectGame("feedback")}
         style={{
@@ -190,8 +224,6 @@ function accuracyLabel(pct) {
   return { text: "Zihnin başka yerdeydi", color: PALETTE.bad };
 }
 
-const AD_SECONDS = 5;
-
 function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStreak }) {
   const [modeIndex, setModeIndex] = useState(1);
   const [customSeconds, setCustomSeconds] = useState(null);
@@ -200,16 +232,13 @@ function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStre
   const [phase, setPhase] = useState("idle");
   const [result, setResult] = useState(null);
   const [glow, setGlow] = useState(0);
-  const [adSecondsLeft, setAdSecondsLeft] = useState(AD_SECONDS);
 
   const startTimeRef = useRef(0);
   const rafRef = useRef(null);
-  const adIntervalRef = useRef(null);
   const mode = customSeconds ? { id: "custom", label: "Manuel", seconds: customSeconds } : MODES[modeIndex];
 
   useEffect(() => () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    if (adIntervalRef.current) clearInterval(adIntervalRef.current);
   }, []);
 
   function handleStart() {
@@ -240,16 +269,9 @@ function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStre
 
   function handleReset() {
     setPhase("ad");
-    setAdSecondsLeft(AD_SECONDS);
-    adIntervalRef.current = setInterval(() => {
-      setAdSecondsLeft((prev) => {
-        if (prev <= 1) { clearInterval(adIntervalRef.current); return 0; }
-        return prev - 1;
-      });
-    }, 1000);
   }
 
-  function skipAd() { if (adIntervalRef.current) clearInterval(adIntervalRef.current); setPhase("idle"); setResult(null); }
+  function finishAd() { setPhase("idle"); setResult(null); }
   function selectPreset(i) { setModeIndex(i); setCustomSeconds(null); setShowCustomInput(false); }
   function openCustomInput() { setShowCustomInput(true); setCustomInput(customSeconds ? String(customSeconds) : ""); }
   function confirmCustomSeconds() {
@@ -311,18 +333,7 @@ function InnerclockGame({ onBack, onReport, history, setHistory, streak, setStre
       </div>
 
       {phase === "ad" ? (
-        <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`, background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
-          <div style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 14 }}>
-            Reklam · {adSecondsLeft > 0 ? `${adSecondsLeft}sn` : "hazır"}
-          </div>
-          <div style={{ width: "100%", height: 140, borderRadius: 10, background: "repeating-linear-gradient(135deg, #232838, #232838 10px, #1C2130 10px, #1C2130 20px)", display: "flex", alignItems: "center", justifyContent: "center", color: "#5A6178", fontSize: 13, marginBottom: 18 }}>
-            Örnek reklam alanı
-          </div>
-          <button type="button" onClick={skipAd} disabled={adSecondsLeft > 0}
-            style={{ padding: "10px 22px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: adSecondsLeft > 0 ? "transparent" : "rgba(217,160,91,0.15)", color: adSecondsLeft > 0 ? PALETTE.faint : PALETTE.bright, fontSize: 13, cursor: adSecondsLeft > 0 ? "default" : "pointer" }}>
-            {adSecondsLeft > 0 ? `Geç (${adSecondsLeft})` : "Devam et"}
-          </button>
-        </div>
+        <AdScreen onDone={finishAd} />
       ) : (
         <button type="button" onClick={handleCircleClick}
           style={{
@@ -392,8 +403,12 @@ function ReactionGame({ onBack, onReport, history, setHistory }) {
   }
 
   function handleTap() {
-    if (phase === "idle" || phase === "result" || phase === "tooearly") {
+    if (phase === "idle") {
       startRound();
+      return;
+    }
+    if (phase === "result" || phase === "tooearly") {
+      setPhase("ad");
       return;
     }
     if (phase === "waiting") {
@@ -411,6 +426,8 @@ function ReactionGame({ onBack, onReport, history, setHistory }) {
     }
   }
 
+  function finishAd() { startRound(); }
+
   const label = lastMs !== null ? reactionLabel(lastMs) : null;
   const bg =
     phase === "ready" ? "radial-gradient(circle, #2A4A32 0%, #10160F 75%)" :
@@ -427,19 +444,23 @@ function ReactionGame({ onBack, onReport, history, setHistory }) {
         Daireye dokun, bekle. Renk değiştiği an tekrar dokun — ne kadar erken, o kadar iyi.
       </p>
 
-      <button type="button" onClick={handleTap}
-        style={{
-          width: 220, height: 220, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
-          cursor: "pointer", padding: 0, marginBottom: 32, background: bg,
-          color: PALETTE.bright, fontSize: 16, fontWeight: 500,
-          transition: "background 0.15s ease",
-        }}>
-        {phase === "idle" && "Dokun, başla"}
-        {phase === "waiting" && "Bekle…"}
-        {phase === "ready" && "ŞİMDİ!"}
-        {phase === "tooearly" && "Çok erken"}
-        {phase === "result" && "Tekrar"}
-      </button>
+      {phase === "ad" ? (
+        <AdScreen onDone={finishAd} />
+      ) : (
+        <button type="button" onClick={handleTap}
+          style={{
+            width: 220, height: 220, borderRadius: "50%", border: `1px solid ${PALETTE.border}`,
+            cursor: "pointer", padding: 0, marginBottom: 32, background: bg,
+            color: PALETTE.bright, fontSize: 16, fontWeight: 500,
+            transition: "background 0.15s ease",
+          }}>
+          {phase === "idle" && "Dokun, başla"}
+          {phase === "waiting" && "Bekle…"}
+          {phase === "ready" && "ŞİMDİ!"}
+          {phase === "tooearly" && "Çok erken"}
+          {phase === "result" && "Tekrar"}
+        </button>
+      )}
 
       <div style={{ textAlign: "center", minHeight: 70, maxWidth: 300 }}>
         {phase === "tooearly" && (
@@ -521,12 +542,16 @@ function MemoryGame({ onBack, onReport, history, setHistory }) {
   }
 
   function reset() {
-    setPhase("idle");
+    setPhase("ad");
   }
+
+  function finishAd() { setPhase("idle"); }
 
   return (
     <Shell>
       <TopBar title="Sayı Hafızası" onBack={onBack} onReport={onReport} />
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
@@ -658,11 +683,16 @@ function CountGame({ onBack, onReport, history, setHistory }) {
     trackEvent("game_round_complete", { game: "count", pct: Math.round(pct) });
   }
 
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { handleStart(); }
+
   const acc = result ? accuracyLabel(result.pct) : null;
 
   return (
     <Shell>
       <TopBar title="Hızlı Sayım" onBack={onBack} onReport={onReport} />
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
@@ -726,7 +756,7 @@ function CountGame({ onBack, onReport, history, setHistory }) {
           <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{result.guess}</div>
           <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>gerçek sayı: {result.actual}</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text} · %{result.pct.toFixed(0)}</div>
-          <button type="button" onClick={handleStart}
+          <button type="button" onClick={playAgain}
             style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
           </button>
@@ -797,9 +827,14 @@ function StroopGame({ onBack, onReport, history, setHistory }) {
   const finalAccuracy = history.length && phase === "result" ? history[0].accuracyPct : null;
   const finalAvgMs = history.length && phase === "result" ? history[0].avgMs : null;
 
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { handleStart(); }
+
   return (
     <Shell>
       <TopBar title="Renk Tuzağı" onBack={onBack} onReport={onReport} />
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
 
       {phase === "idle" && (
         <>
@@ -841,7 +876,7 @@ function StroopGame({ onBack, onReport, history, setHistory }) {
         <div style={{ textAlign: "center" }}>
           <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{finalAccuracy ? finalAccuracy.toFixed(0) : 0}</div>
           <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>doğruluk · ortalama {finalAvgMs ? formatMs(finalAvgMs) : 0}ms</div>
-          <button type="button" onClick={handleStart}
+          <button type="button" onClick={playAgain}
             style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
           </button>
@@ -932,6 +967,271 @@ function FeedbackForm({ onBack }) {
   );
 }
 
+/* ---------------- SUDOKU ---------------- */
+
+const SUDOKU_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", givens: 40 },
+  { id: "orta", label: "Orta", givens: 32 },
+  { id: "zor", label: "Zor", givens: 26 },
+];
+
+function shuffleArr(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function isValidPlacement(grid, r, c, n) {
+  for (let i = 0; i < 9; i++) {
+    if (grid[r][i] === n) return false;
+    if (grid[i][c] === n) return false;
+  }
+  const br = Math.floor(r / 3) * 3, bc = Math.floor(c / 3) * 3;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    if (grid[br + i][bc + j] === n) return false;
+  }
+  return true;
+}
+
+function makeFullGrid() {
+  const grid = Array.from({ length: 9 }, () => Array(9).fill(0));
+  function fill(pos) {
+    if (pos === 81) return true;
+    const r = Math.floor(pos / 9), c = pos % 9;
+    for (const n of shuffleArr([1,2,3,4,5,6,7,8,9])) {
+      if (isValidPlacement(grid, r, c, n)) {
+        grid[r][c] = n;
+        if (fill(pos + 1)) return true;
+        grid[r][c] = 0;
+      }
+    }
+    return false;
+  }
+  fill(0);
+  return grid;
+}
+
+function countSolutions(grid, limit) {
+  let br = -1, bc = -1, bestCount = 10;
+  for (let r = 0; r < 9; r++) for (let c = 0; c < 9; c++) {
+    if (grid[r][c] === 0) {
+      let count = 0;
+      for (let n = 1; n <= 9; n++) if (isValidPlacement(grid, r, c, n)) count++;
+      if (count === 0) return 0;
+      if (count < bestCount) { bestCount = count; br = r; bc = c; }
+    }
+  }
+  if (br === -1) return 1;
+  let total = 0;
+  for (let n = 1; n <= 9; n++) {
+    if (isValidPlacement(grid, br, bc, n)) {
+      grid[br][bc] = n;
+      total += countSolutions(grid, limit - total);
+      grid[br][bc] = 0;
+      if (total >= limit) return total;
+    }
+  }
+  return total;
+}
+
+function generateSudokuPuzzle(targetGivens) {
+  const solution = makeFullGrid();
+  const puzzle = solution.map((row) => row.slice());
+  const positions = shuffleArr(Array.from({ length: 81 }, (_, i) => i));
+  let givens = 81;
+  for (const pos of positions) {
+    if (givens <= targetGivens) break;
+    const r = Math.floor(pos / 9), c = pos % 9;
+    if (puzzle[r][c] === 0) continue;
+    const backup = puzzle[r][c];
+    puzzle[r][c] = 0;
+    const testGrid = puzzle.map((row) => row.slice());
+    const solCount = countSolutions(testGrid, 2);
+    if (solCount === 1) { givens--; } else { puzzle[r][c] = backup; }
+  }
+  return { puzzle, solution };
+}
+
+function formatClock(ms) {
+  const totalSec = Math.floor(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s < 10 ? "0" : ""}${s}`;
+}
+
+function SudokuGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | loading | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [puzzle, setPuzzle] = useState(null);
+  const [given, setGiven] = useState(null);
+  const [solution, setSolution] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [mistakes, setMistakes] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const timerRef = useRef(null);
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  function startGame() {
+    setPhase("loading");
+    setTimeout(() => {
+      const diff = SUDOKU_DIFFICULTIES[difficultyIndex];
+      const { puzzle: p, solution: s } = generateSudokuPuzzle(diff.givens);
+      setPuzzle(p.map((row) => row.slice()));
+      setGiven(p.map((row) => row.map((v) => v !== 0)));
+      setSolution(s);
+      setSelected(null);
+      setMistakes(0);
+      setStartTime(Date.now());
+      setElapsedMs(0);
+      setPhase("playing");
+    }, 50);
+  }
+
+  useEffect(() => {
+    if (phase === "playing") {
+      timerRef.current = setInterval(() => setElapsedMs(Date.now() - startTime), 500);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [phase, startTime]);
+
+  function selectCell(r, c) {
+    if (phase !== "playing") return;
+    setSelected({ r, c });
+  }
+
+  function pressDigit(n) {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    if (given[r][c]) return;
+    const next = puzzle.map((row) => row.slice());
+    next[r][c] = n;
+    setPuzzle(next);
+    if (solution[r][c] !== n) setMistakes((m) => m + 1);
+    const complete = next.every((row, ri) => row.every((v, ci) => v === solution[ri][ci]));
+    if (complete) {
+      clearInterval(timerRef.current);
+      const timeMs = Date.now() - startTime;
+      const entry = { difficulty: SUDOKU_DIFFICULTIES[difficultyIndex].label, timeMs, mistakes, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      trackEvent("game_round_complete", { game: "sudoku", difficulty: entry.difficulty, timeMs, mistakes });
+      setPhase("result");
+    }
+  }
+
+  function eraseCell() {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    if (given[r][c]) return;
+    const next = puzzle.map((row) => row.slice());
+    next[r][c] = 0;
+    setPuzzle(next);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestTime = history.length ? Math.min(...history.map((h) => h.timeMs)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Sudoku" onBack={onBack} onReport={onReport} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {SUDOKU_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? PALETTE.amber : PALETTE.border}`,
+                  background: difficultyIndex === i ? PALETTE.amberSoft : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label}</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 280, marginBottom: 24 }}>
+            Klasik 9x9. Diğerlerinden farklı olarak birkaç dakika sürebilir.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: "radial-gradient(circle, #1C2333 0%, #12161F 75%)", color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestTime !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatClock(bestTime)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "loading" && (
+        <p style={{ color: PALETTE.dim, fontSize: 14, marginTop: 40 }}>Bulmaca hazırlanıyor…</p>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && puzzle && (
+        <>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
+            <span>Süre: <span className="mono" style={{ color: PALETTE.amber, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+            <span>Hata: <span style={{ color: mistakes > 0 ? PALETTE.bad : PALETTE.good, fontWeight: 600 }}>{mistakes}</span></span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", width: "100%", maxWidth: 306, aspectRatio: "1", border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
+            {puzzle.map((row, ri) => row.map((val, ci) => {
+              const isGiven = given[ri][ci];
+              const isSelected = selected && selected.r === ri && selected.c === ci;
+              const isWrong = val !== 0 && !isGiven && solution[ri][ci] !== val;
+              const boxIndex = Math.floor(ri / 3) * 3 + Math.floor(ci / 3);
+              return (
+                <button key={`${ri}-${ci}`} type="button" onClick={() => selectCell(ri, ci)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: isSelected ? "rgba(217,160,91,0.2)" : (boxIndex % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent"),
+                    border: "none",
+                    borderRight: (ci % 3 === 2 && ci !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
+                    borderBottom: (ri % 3 === 2 && ri !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
+                    color: isGiven ? PALETTE.bright : isWrong ? PALETTE.bad : PALETTE.amber,
+                    fontWeight: isGiven ? 700 : 600, fontSize: 15, cursor: "pointer", padding: 0,
+                  }}>
+                  {val !== 0 ? val : ""}
+                </button>
+              );
+            }))}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: 306, marginBottom: 12 }}>
+            {[1,2,3,4,5,6,7,8,9].map((n) => (
+              <button key={n} type="button" onClick={() => pressDigit(n)}
+                style={{ padding: "10px 0", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={eraseCell}
+            style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 13, cursor: "pointer" }}>
+            Sil
+          </button>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatClock(elapsedMs)}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>{mistakes} hata · {SUDOKU_DIFFICULTIES[difficultyIndex].label}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.good, marginBottom: 24 }}>Tamamlandı!</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: PALETTE.amberSoft, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
 /* ---------------- RAPOR ---------------- */
 
 function innerclockMessage(history) {
@@ -985,6 +1285,16 @@ function stroopMessage(history) {
   return `Ortalama %${avgAcc.toFixed(0)} — kelimenin anlamı rengi geçici olarak bastırıyor. Bu test genelde ilk denemelerde zorlayıcıdır, tekrar ettikçe kolaylaşır.`;
 }
 
+function sudokuMessage(history) {
+  if (history.length === 0) return "Henüz hiç bulmaca çözmedin. İlk Sudoku'nu tamamla, burada nasıl gittiğini görelim.";
+  const avgMs = history.reduce((s, h) => s + h.timeMs, 0) / history.length;
+  const avgMistakes = history.reduce((s, h) => s + h.mistakes, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.timeMs));
+  if (avgMs <= 180000 && avgMistakes <= 1) return `Hem hızlı hem temiz çözüyorsun — ortalama ${formatClock(avgMs)}, ortalama ${avgMistakes.toFixed(1)} hata. Sağlam bir mantık yürütme hızın var.`;
+  if (avgMs <= 300000) return `Ortalama ${formatClock(avgMs)} sürede tamamlıyorsun, en iyi çözümün ${formatClock(best)}. İyi bir tempo.`;
+  return `Ortalama ${formatClock(avgMs)} sürüyor çözmen, bu tamamen normal — Sudoku sabır işi, hızın zamanla artacak.`;
+}
+
 function Report({ type, history, onBack }) {
   const titles = {
     innerclock: "İç Saat Raporu",
@@ -992,6 +1302,7 @@ function Report({ type, history, onBack }) {
     memory: "Sayı Hafızası Raporu",
     count: "Hızlı Sayım Raporu",
     stroop: "Renk Tuzağı Raporu",
+    sudoku: "Sudoku Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -1000,6 +1311,7 @@ function Report({ type, history, onBack }) {
     memory: memoryMessage,
     count: countMessage,
     stroop: stroopMessage,
+    sudoku: sudokuMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -1021,6 +1333,9 @@ function Report({ type, history, onBack }) {
     } else if (type === "stroop") {
       best = Math.max(...history.map((h) => h.accuracyPct)).toFixed(0) + "%";
       avg = (history.reduce((s, h) => s + h.accuracyPct, 0) / count).toFixed(0) + "%";
+    } else if (type === "sudoku") {
+      best = formatClock(Math.min(...history.map((h) => h.timeMs)));
+      avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
     }
   }
 
@@ -1091,6 +1406,13 @@ function Report({ type, history, onBack }) {
                     <span style={{ color: accuracyLabel(h.accuracyPct).color }}>{h.accuracyPct.toFixed(0)}%</span>
                   </>
                 )}
+                {type === "sudoku" && (
+                  <>
+                    <span>{h.difficulty}</span>
+                    <span className="mono">{formatClock(h.timeMs)}</span>
+                    <span style={{ color: h.mistakes === 0 ? PALETTE.good : PALETTE.amber }}>{h.mistakes} hata</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -1110,6 +1432,7 @@ function App() {
   const [memoryHistory, setMemoryHistory] = useState([]);
   const [countHistory, setCountHistory] = useState([]);
   const [stroopHistory, setStroopHistory] = useState([]);
+  const [sudokuHistory, setSudokuHistory] = useState([]);
 
   return (
     <>
@@ -1118,6 +1441,7 @@ function App() {
           onSelect={setView}
           icHistory={icHistory} reactionHistory={reactionHistory}
           memoryHistory={memoryHistory} countHistory={countHistory} stroopHistory={stroopHistory}
+          sudokuHistory={sudokuHistory}
         />
       )}
       {view === "innerclock" && (
@@ -1156,12 +1480,20 @@ function App() {
           history={stroopHistory} setHistory={setStroopHistory}
         />
       )}
+      {view === "sudoku" && (
+        <SudokuGame
+          onBack={() => setView("home")}
+          onReport={() => setView("report-sudoku")}
+          history={sudokuHistory} setHistory={setSudokuHistory}
+        />
+      )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
       {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
       {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
       {view === "report-memory" && <Report type="memory" history={memoryHistory} onBack={() => setView("memory")} />}
       {view === "report-count" && <Report type="count" history={countHistory} onBack={() => setView("count")} />}
       {view === "report-stroop" && <Report type="stroop" history={stroopHistory} onBack={() => setView("stroop")} />}
+      {view === "report-sudoku" && <Report type="sudoku" history={sudokuHistory} onBack={() => setView("sudoku")} />}
     </>
   );
 }
