@@ -64,6 +64,13 @@ const GAME_THEMES = {
   sudoku:     { accent: "#7FB88A", soft: "rgba(127,184,138,0.12)" },
   "2048":     { accent: "#6B8FD9", soft: "rgba(107,143,217,0.12)" },
   minesweeper:{ accent: "#8C97B8", soft: "rgba(140,151,184,0.12)" },
+  tetris:     { accent: "#D4C14A", soft: "rgba(212,193,74,0.12)" },
+  skyscrapers:{ accent: "#C25B7B", soft: "rgba(194,91,123,0.12)" },
+  nback:      { accent: "#5BA8D9", soft: "rgba(91,168,217,0.12)" },
+  balance:    { accent: "#C98B5B", soft: "rgba(201,139,91,0.12)" },
+  quicksort:  { accent: "#8BC95B", soft: "rgba(139,201,91,0.12)" },
+  linecompare:{ accent: "#5BD9A8", soft: "rgba(91,217,168,0.12)" },
+  oddoneout:  { accent: "#B85BC9", soft: "rgba(184,91,201,0.12)" },
 };
 
 function Shell({ children }) {
@@ -221,7 +228,7 @@ function Home({ onSelect }) {
         icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
         title="Bulmacalar"
         subtitle="Uzun soluklu klasikler"
-        count="3 oyun"
+        count="5 oyun"
         accent={GAME_THEMES.sudoku.accent}
         onClick={() => onSelect("cat-puzzles")}
       />
@@ -250,12 +257,17 @@ function CategoryList({ title, onBack, onSelectGame, children }) {
   );
 }
 
-function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory }) {
+function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, nbackHistory, balanceHistory, quicksortHistory, linecompareHistory, oddoneoutHistory }) {
   const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
   const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
   const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
   const countBest = countHistory.length ? Math.max(...countHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
   const stroopBest = stroopHistory.length ? Math.max(...stroopHistory.map((h) => h.accuracyPct)).toFixed(0) + "%" : null;
+  const nbackBest = nbackHistory.length ? Math.max(...nbackHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const balanceBest = balanceHistory.length ? Math.max(...balanceHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const quicksortBest = quicksortHistory.length ? formatMs(Math.min(...quicksortHistory.map((h) => h.timeMs))) + "ms" : null;
+  const linecompareBest = linecompareHistory.length ? Math.max(...linecompareHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const oddoneoutBest = oddoneoutHistory.length ? formatMs(Math.min(...oddoneoutHistory.map((h) => h.ms))) + "ms" : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -274,15 +286,27 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
         onClick={() => selectGame("count")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.stroop.accent, fontSize: 14, fontWeight: 700 }}>Aa</span>} title="Renk Tuzağı" subtitle="Zihnin renge mi kelimeye mi kanıyor?" stat={stroopBest} accent={GAME_THEMES.stroop.accent}
         onClick={() => selectGame("stroop")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.nback.accent, fontSize: 16, fontWeight: 700 }}>2↩</span>} title="Sıra Bulma" subtitle="2 önceki ile aynı mıydı?" stat={nbackBest} accent={GAME_THEMES.nback.accent}
+        onClick={() => selectGame("nback")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.balance.accent, fontSize: 18 }}>⟷</span>} title="Denge Noktası" subtitle="Tam ortadan geçtiği anı yakala" stat={balanceBest} accent={GAME_THEMES.balance.accent}
+        onClick={() => selectGame("balance")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.quicksort.accent, fontSize: 15, fontWeight: 700 }}>1-9</span>} title="Hızlı Sıralama" subtitle="Sayılara doğru sırayla dokun" stat={quicksortBest} accent={GAME_THEMES.quicksort.accent}
+        onClick={() => selectGame("quicksort")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.linecompare.accent, fontSize: 18 }}>▤▥</span>} title="Çizgi Kıyası" subtitle="Hangisi daha büyük?" stat={linecompareBest} accent={GAME_THEMES.linecompare.accent}
+        onClick={() => selectGame("linecompare")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.oddoneout.accent, fontSize: 16 }}>◉</span>} title="Tek Farklı" subtitle="Aralarındaki farklı olanı bul" stat={oddoneoutBest} accent={GAME_THEMES.oddoneout.accent}
+        onClick={() => selectGame("oddoneout")} />
     </CategoryList>
   );
 }
 
-function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory }) {
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, tetrisHistory, skyscraperHistory }) {
   const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
   const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
   const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
+  const tetrisBest = tetrisHistory.length ? Math.max(...tetrisHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
+  const skyBest = skyscraperHistory.length ? formatClock(Math.min(...skyscraperHistory.map((h) => h.timeMs))) : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -297,6 +321,10 @@ function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, min
         onClick={() => selectGame("2048")} />
       <GameCard icon={<span style={{ fontSize: 18 }}>💣</span>} title="Mayın Tarlası" subtitle="Sayılara güvenerek ilerle" stat={msBest} accent={GAME_THEMES.minesweeper.accent}
         onClick={() => selectGame("minesweeper")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.tetris.accent, fontSize: 18 }}>▤</span>} title="Tetris" subtitle="Parçaları düşür, sıraları temizle" stat={tetrisBest} accent={GAME_THEMES.tetris.accent}
+        onClick={() => selectGame("tetris")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.skyscrapers.accent, fontSize: 18 }}>🏙</span>} title="Kule Bulmaca" subtitle="Kenar ipuçlarıyla ızgarayı doldur" stat={skyBest} accent={GAME_THEMES.skyscrapers.accent}
+        onClick={() => selectGame("skyscrapers")} />
     </CategoryList>
   );
 }
@@ -1283,7 +1311,7 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
             <span>Hata: <span style={{ color: mistakes > 0 ? PALETTE.bad : PALETTE.good, fontWeight: 600 }}>{mistakes}</span></span>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", width: "100%", maxWidth: 342, aspectRatio: "1", border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", width: "100%", maxWidth: "min(420px, 92vw)", aspectRatio: "1", border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18 }}>
             {puzzle.map((row, ri) => row.map((val, ci) => {
               const isGiven = given[ri][ci];
               const isSelected = selected && selected.r === ri && selected.c === ci;
@@ -1298,7 +1326,7 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
                     borderRight: (ci % 3 === 2 && ci !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
                     borderBottom: (ri % 3 === 2 && ri !== 8) ? `2px solid ${PALETTE.border}` : "1px solid rgba(255,255,255,0.05)",
                     color: isGiven ? PALETTE.bright : isWrong ? PALETTE.bad : ACCENT,
-                    fontWeight: isGiven ? 700 : 600, fontSize: 21, cursor: "pointer", padding: 0,
+                    fontWeight: isGiven ? 700 : 600, fontSize: "clamp(16px, 4.2vw, 26px)", cursor: "pointer", padding: 0,
                   }}>
                   {val !== 0 ? val : ""}
                 </button>
@@ -1306,16 +1334,16 @@ function SudokuGame({ onBack, onReport, history, setHistory }) {
             }))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: 342, marginBottom: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: "min(420px, 92vw)", marginBottom: 12 }}>
             {[1,2,3,4,5,6,7,8,9].map((n) => (
               <button key={n} type="button" onClick={() => pressDigit(n)}
-                style={{ padding: "12px 0", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: 18, fontWeight: 600, cursor: "pointer" }}>
+                style={{ minHeight: 48, borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: "clamp(15px, 3.6vw, 20px)", fontWeight: 600, cursor: "pointer" }}>
                 {n}
               </button>
             ))}
           </div>
           <button type="button" onClick={eraseCell}
-            style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 13, cursor: "pointer" }}>
+            style={{ padding: "10px 24px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 14, cursor: "pointer" }}>
             Sil
           </button>
         </>
@@ -1426,7 +1454,7 @@ function tileStyle(value, ACCENT) {
   const intensity = Math.min(1, Math.log2(value) / 11);
   const bg = hexToRgba(ACCENT, 0.12 + intensity * 0.7);
   const textColor = intensity > 0.45 ? "#0B0D14" : PALETTE.bright;
-  const fontSize = value >= 1000 ? 16 : value >= 100 ? 19 : 22;
+  const fontSize = value >= 1000 ? "clamp(14px, 3.2vw, 20px)" : value >= 100 ? "clamp(16px, 3.6vw, 24px)" : "clamp(18px, 4.2vw, 28px)";
   return { background: bg, color: textColor, fontSize };
 }
 
@@ -1531,7 +1559,7 @@ function Game2048({ onBack, onReport, history, setHistory }) {
             onTouchEnd={onTouchEnd}
             style={{
               display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8,
-              width: "100%", maxWidth: 320, aspectRatio: "1",
+              width: "100%", maxWidth: "min(420px, 92vw)", aspectRatio: "1",
               border: `2px solid ${PALETTE.border}`, borderRadius: 12, padding: 8,
               boxSizing: "border-box", marginBottom: 20, background: "rgba(255,255,255,0.015)",
             }}>
@@ -1578,8 +1606,19 @@ function Game2048({ onBack, onReport, history, setHistory }) {
 
 function dpadBtnStyle(accent) {
   return {
-    padding: "12px 0", borderRadius: 10, border: `1px solid ${PALETTE.border}`,
-    background: "rgba(255,255,255,0.03)", color: accent, fontSize: 14, cursor: "pointer",
+    flex: 1,
+    minWidth: 56,
+    minHeight: 56,
+    borderRadius: 14,
+    border: `1px solid ${PALETTE.border}`,
+    background: "rgba(255,255,255,0.03)",
+    color: accent,
+    fontSize: "clamp(20px, 6vw, 30px)",
+    fontWeight: 700,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
   };
 }
 
@@ -1807,7 +1846,7 @@ function MinesweeperGame({ onBack, onReport, history, setHistory }) {
 
           <div style={{
             display: "grid", gridTemplateColumns: `repeat(${diff.cols}, 1fr)`,
-            width: "100%", maxWidth: 320, aspectRatio: `${diff.cols} / ${diff.rows}`,
+            width: "100%", maxWidth: "min(420px, 92vw)", aspectRatio: `${diff.cols} / ${diff.rows}`,
             border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 16,
           }}>
             {grid.flat().map((cell, i) => {
@@ -1819,7 +1858,7 @@ function MinesweeperGame({ onBack, onReport, history, setHistory }) {
                     background: cell.revealed ? (cell.mine ? "rgba(201,112,94,0.3)" : "rgba(255,255,255,0.02)") : "rgba(255,255,255,0.05)",
                     border: "1px solid rgba(255,255,255,0.04)",
                     color: cell.revealed ? msNumberColor(cell.adj) : PALETTE.dim,
-                    fontWeight: 700, fontSize: diff.cols >= 12 ? 10 : diff.cols >= 10 ? 12 : 14,
+                    fontWeight: 700, fontSize: diff.cols >= 12 ? "clamp(10px, 2.6vw, 16px)" : diff.cols >= 10 ? "clamp(11px, 3vw, 18px)" : "clamp(13px, 3.6vw, 20px)",
                     cursor: "pointer", padding: 0,
                   }}>
                   {cell.revealed ? (cell.mine ? "💣" : (cell.adj > 0 ? cell.adj : "")) : (cell.flagged ? "🚩" : "")}
@@ -1837,6 +1876,1254 @@ function MinesweeperGame({ onBack, onReport, history, setHistory }) {
           <div style={{ fontSize: 15, fontWeight: 600, color: outcome === "won" ? PALETTE.good : PALETTE.bad, marginBottom: 24 }}>
             {outcome === "won" ? "Kazandın!" : "Mayına bastın"}
           </div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- TETRIS ---------------- */
+
+const TETRIS_ROWS = 20;
+const TETRIS_COLS = 10;
+
+const TETROMINOES = {
+  I: { color: "#5BC2C9", rotations: [
+    [[0,1],[1,1],[2,1],[3,1]],
+    [[2,0],[2,1],[2,2],[2,3]],
+    [[0,2],[1,2],[2,2],[3,2]],
+    [[1,0],[1,1],[1,2],[1,3]],
+  ]},
+  O: { color: "#D9C25B", rotations: [
+    [[1,0],[2,0],[1,1],[2,1]],
+    [[1,0],[2,0],[1,1],[2,1]],
+    [[1,0],[2,0],[1,1],[2,1]],
+    [[1,0],[2,0],[1,1],[2,1]],
+  ]},
+  T: { color: "#9B8ED9", rotations: [
+    [[1,0],[0,1],[1,1],[2,1]],
+    [[1,0],[1,1],[2,1],[1,2]],
+    [[0,1],[1,1],[2,1],[1,2]],
+    [[1,0],[0,1],[1,1],[1,2]],
+  ]},
+  S: { color: "#7FA88C", rotations: [
+    [[1,0],[2,0],[0,1],[1,1]],
+    [[1,0],[1,1],[2,1],[2,2]],
+    [[1,1],[2,1],[0,2],[1,2]],
+    [[0,0],[0,1],[1,1],[1,2]],
+  ]},
+  Z: { color: "#C9705E", rotations: [
+    [[0,0],[1,0],[1,1],[2,1]],
+    [[2,0],[1,1],[2,1],[1,2]],
+    [[0,1],[1,1],[1,2],[2,2]],
+    [[1,0],[0,1],[1,1],[0,2]],
+  ]},
+  J: { color: "#5E8FC9", rotations: [
+    [[0,0],[0,1],[1,1],[2,1]],
+    [[1,0],[2,0],[1,1],[1,2]],
+    [[0,1],[1,1],[2,1],[2,2]],
+    [[1,0],[1,1],[0,2],[1,2]],
+  ]},
+  L: { color: "#D9A05B", rotations: [
+    [[2,0],[0,1],[1,1],[2,1]],
+    [[1,0],[1,1],[1,2],[2,2]],
+    [[0,1],[1,1],[2,1],[0,2]],
+    [[0,0],[1,0],[1,1],[1,2]],
+  ]},
+};
+
+function tetrisCollision(board, type, rot, x, y) {
+  const cells = TETROMINOES[type].rotations[rot];
+  for (const [dx, dy] of cells) {
+    const bx = x + dx, by = y + dy;
+    if (bx < 0 || bx >= TETRIS_COLS || by >= TETRIS_ROWS) return true;
+    if (by >= 0 && board[by][bx]) return true;
+  }
+  return false;
+}
+
+function tetrisMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Parçaları düşür, sıraları tamamla, ilk skorunu görelim.";
+  const bestScore = Math.max(...history.map((h) => h.score));
+  const bestLevel = Math.max(...history.map((h) => h.level));
+  const avgLines = history.reduce((s, h) => s + h.lines, 0) / history.length;
+  if (bestLevel >= 8) return `Seviye ${bestLevel}'e kadar çıkmışsın, en iyi skorun ${bestScore.toLocaleString("tr-TR")}. Bu hızda oynamak ciddi refleks ve öngörü istiyor.`;
+  if (bestLevel >= 4) return `En iyi skorun ${bestScore.toLocaleString("tr-TR")}, seviye ${bestLevel}'e ulaşmışsın. Ortalama ${avgLines.toFixed(0)} sıra temizliyorsun — sağlam bir tempo.`;
+  return `En iyi skorun ${bestScore.toLocaleString("tr-TR")}. İpucu: parçaları düz tutup boşluk bırakmamak, sıraları daha hızlı temizlemene yardımcı olur.`;
+}
+
+function TetrisGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [, forceRender] = useState(0);
+  const gameRef = useRef(null);
+  const intervalRef = useRef(null);
+  const finalStatsRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.tetris.accent;
+  const ACCENT_SOFT = GAME_THEMES.tetris.soft;
+
+  useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
+
+  function bump() { forceRender((n) => n + 1); }
+
+  function newBag() {
+    const types = ["I", "O", "T", "S", "Z", "J", "L"];
+    for (let i = types.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [types[i], types[j]] = [types[j], types[i]];
+    }
+    return types;
+  }
+
+  function drawFromBag(g) {
+    if (g.bag.length === 0) g.bag = newBag();
+    return g.bag.shift();
+  }
+
+  function spawnPiece(g) {
+    const type = g.nextType || drawFromBag(g);
+    g.nextType = drawFromBag(g);
+    return { type, rot: 0, x: 3, y: 0 };
+  }
+
+  function lockPiece(g) {
+    const cells = TETROMINOES[g.piece.type].rotations[g.piece.rot];
+    const color = TETROMINOES[g.piece.type].color;
+    for (const [dx, dy] of cells) {
+      const bx = g.piece.x + dx, by = g.piece.y + dy;
+      if (by >= 0 && by < TETRIS_ROWS && bx >= 0 && bx < TETRIS_COLS) g.board[by][bx] = color;
+    }
+    let cleared = 0;
+    const kept = g.board.filter((row) => {
+      const full = row.every((cell) => cell !== null);
+      if (full) cleared++;
+      return !full;
+    });
+    while (kept.length < TETRIS_ROWS) kept.unshift(Array(TETRIS_COLS).fill(null));
+    g.board = kept;
+    if (cleared > 0) {
+      const points = [0, 100, 300, 500, 800][cleared] * g.level;
+      g.score += points;
+      g.lines += cleared;
+      g.level = 1 + Math.floor(g.lines / 10);
+    }
+    const newPiece = spawnPiece(g);
+    if (tetrisCollision(g.board, newPiece.type, newPiece.rot, newPiece.x, newPiece.y)) {
+      g.gameOver = true;
+    } else {
+      g.piece = newPiece;
+    }
+  }
+
+  function softDropStep(g) {
+    if (!tetrisCollision(g.board, g.piece.type, g.piece.rot, g.piece.x, g.piece.y + 1)) {
+      g.piece.y += 1;
+      return true;
+    }
+    lockPiece(g);
+    return false;
+  }
+
+  function startInterval(level) {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const speed = Math.max(120, 800 - (level - 1) * 70);
+    intervalRef.current = setInterval(tick, speed);
+  }
+
+  function endGame() {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    const g = gameRef.current;
+    const entry = { score: g.score, level: g.level, lines: g.lines, id: Date.now() };
+    finalStatsRef.current = entry;
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    trackEvent("game_round_complete", { game: "tetris", score: g.score, level: g.level, lines: g.lines });
+    setPhase("result");
+  }
+
+  function tick() {
+    const g = gameRef.current;
+    if (!g || g.gameOver) return;
+    const prevLevel = g.level;
+    softDropStep(g);
+    bump();
+    if (g.gameOver) { endGame(); return; }
+    if (g.level !== prevLevel) startInterval(g.level);
+  }
+
+  function startGame() {
+    const board = Array.from({ length: TETRIS_ROWS }, () => Array(TETRIS_COLS).fill(null));
+    const g = { board, bag: [], nextType: null, score: 0, level: 1, lines: 0, gameOver: false };
+    g.nextType = drawFromBag(g);
+    g.piece = spawnPiece(g);
+    gameRef.current = g;
+    setPhase("playing");
+    startInterval(1);
+  }
+
+  function handleLeft() {
+    const g = gameRef.current;
+    if (!g || g.gameOver || phase !== "playing") return;
+    if (!tetrisCollision(g.board, g.piece.type, g.piece.rot, g.piece.x - 1, g.piece.y)) g.piece.x -= 1;
+    bump();
+  }
+  function handleRight() {
+    const g = gameRef.current;
+    if (!g || g.gameOver || phase !== "playing") return;
+    if (!tetrisCollision(g.board, g.piece.type, g.piece.rot, g.piece.x + 1, g.piece.y)) g.piece.x += 1;
+    bump();
+  }
+  function handleRotate() {
+    const g = gameRef.current;
+    if (!g || g.gameOver || phase !== "playing") return;
+    const nextRot = (g.piece.rot + 1) % 4;
+    for (const k of [0, -1, 1, -2, 2]) {
+      if (!tetrisCollision(g.board, g.piece.type, nextRot, g.piece.x + k, g.piece.y)) {
+        g.piece.rot = nextRot;
+        g.piece.x += k;
+        break;
+      }
+    }
+    bump();
+  }
+  function handleSoftDrop() {
+    const g = gameRef.current;
+    if (!g || g.gameOver || phase !== "playing") return;
+    softDropStep(g);
+    bump();
+    if (g.gameOver) endGame();
+  }
+  function handleHardDrop() {
+    const g = gameRef.current;
+    if (!g || g.gameOver || phase !== "playing") return;
+    let steps = 0;
+    while (!tetrisCollision(g.board, g.piece.type, g.piece.rot, g.piece.x, g.piece.y + 1)) {
+      g.piece.y += 1;
+      steps++;
+    }
+    g.score += steps * 2;
+    lockPiece(g);
+    bump();
+    if (g.gameOver) endGame();
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestScoreEver = history.length ? Math.max(...history.map((h) => h.score)) : null;
+  const g = gameRef.current;
+
+  let displayBoard = null;
+  if (g && phase === "playing") {
+    displayBoard = g.board.map((row) => row.slice());
+    if (g.piece && !g.gameOver) {
+      const cells = TETROMINOES[g.piece.type].rotations[g.piece.rot];
+      const color = TETROMINOES[g.piece.type].color;
+      for (const [dx, dy] of cells) {
+        const bx = g.piece.x + dx, by = g.piece.y + dy;
+        if (by >= 0 && by < TETRIS_ROWS && bx >= 0 && bx < TETRIS_COLS) displayBoard[by][bx] = color;
+      }
+    }
+  }
+
+  return (
+    <Shell>
+      <TopBar title="Tetris" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Yukarıdan düşen parçaları döndürüp yerleştir. Bir sırayı tamamen doldurunca o sıra silinir ve puan kazanırsın. Parçalar üste yığılırsa oyun biter. Sıra temizledikçe hız artar.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestScoreEver !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi skor: {bestScoreEver.toLocaleString("tr-TR")}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && g && displayBoard && (
+        <>
+          <div style={{ display: "flex", gap: 16, fontSize: 12, color: PALETTE.dim, marginBottom: 12, flexWrap: "wrap", justifyContent: "center" }}>
+            <span>Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{g.score.toLocaleString("tr-TR")}</span></span>
+            <span>Seviye: <span style={{ color: PALETTE.good, fontWeight: 600 }}>{g.level}</span></span>
+            <span>Sıra: <span style={{ color: PALETTE.dim, fontWeight: 600 }}>{g.lines}</span></span>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: `repeat(${TETRIS_COLS}, 1fr)`,
+            width: "100%", maxWidth: "min(260px, 62vw)", aspectRatio: `${TETRIS_COLS} / ${TETRIS_ROWS}`,
+            border: `2px solid ${PALETTE.border}`, borderRadius: 6, overflow: "hidden", marginBottom: 18,
+            background: "rgba(255,255,255,0.015)",
+          }}>
+            {displayBoard.flat().map((cell, i) => (
+              <div key={i} style={{
+                background: cell || "transparent",
+                border: cell ? "1px solid rgba(0,0,0,0.15)" : "1px solid rgba(255,255,255,0.02)",
+              }} />
+            ))}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", width: "100%", maxWidth: 380, marginBottom: 14 }}>
+            <button type="button" onClick={handleLeft} style={dpadBtnStyle(ACCENT)}>◀</button>
+            <button type="button" onClick={handleRotate} style={dpadBtnStyle(ACCENT)}>⟳</button>
+            <button type="button" onClick={handleRight} style={dpadBtnStyle(ACCENT)}>▶</button>
+            <button type="button" onClick={handleSoftDrop} style={dpadBtnStyle(ACCENT)}>▼</button>
+          </div>
+          <button type="button" onClick={handleHardDrop}
+            style={{ width: "100%", maxWidth: 380, padding: "16px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+            Bırak (anında düşür)
+          </button>
+        </>
+      )}
+
+      {phase === "result" && finalStatsRef.current && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{finalStatsRef.current.score.toLocaleString("tr-TR")}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>seviye {finalStatsRef.current.level} · {finalStatsRef.current.lines} sıra</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.bad, marginBottom: 24 }}>Oyun bitti</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- KULE BULMACA (SKYSCRAPERS) ---------------- */
+
+const SKYSCRAPER_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", n: 4 },
+  { id: "orta", label: "Orta", n: 5 },
+  { id: "zor", label: "Zor", n: 6 },
+];
+
+function visibleCountSky(line) {
+  let count = 0, max = 0;
+  for (const h of line) { if (h > max) { count++; max = h; } }
+  return count;
+}
+
+function makeLatinSquare(n) {
+  const grid = Array.from({ length: n }, () => Array(n).fill(0));
+  function fill(r, c) {
+    if (r === n) return true;
+    const nr = c === n - 1 ? r + 1 : r;
+    const nc = c === n - 1 ? 0 : c + 1;
+    for (const v of shuffleArr(Array.from({ length: n }, (_, i) => i + 1))) {
+      if (grid[r].includes(v)) continue;
+      let colOk = true;
+      for (let rr = 0; rr < r; rr++) if (grid[rr][c] === v) { colOk = false; break; }
+      if (!colOk) continue;
+      grid[r][c] = v;
+      if (fill(nr, nc)) return true;
+      grid[r][c] = 0;
+    }
+    return false;
+  }
+  fill(0, 0);
+  return grid;
+}
+
+function computeSkyClues(grid, n) {
+  const left = [], right = [], top = [], bottom = [];
+  for (let r = 0; r < n; r++) {
+    const row = grid[r];
+    left.push(visibleCountSky(row));
+    right.push(visibleCountSky(row.slice().reverse()));
+  }
+  for (let c = 0; c < n; c++) {
+    const col = grid.map((row) => row[c]);
+    top.push(visibleCountSky(col));
+    bottom.push(visibleCountSky(col.slice().reverse()));
+  }
+  return { left, right, top, bottom };
+}
+
+function countSkySolutions(clues, n, limit) {
+  const grid = Array.from({ length: n }, () => Array(n).fill(0));
+  let solutions = 0;
+
+  function rowClueOk(r) {
+    const row = grid[r];
+    return visibleCountSky(row) === clues.left[r] && visibleCountSky(row.slice().reverse()) === clues.right[r];
+  }
+  function allColsOk() {
+    for (let c = 0; c < n; c++) {
+      const col = grid.map((row) => row[c]);
+      if (visibleCountSky(col) !== clues.top[c]) return false;
+      if (visibleCountSky(col.slice().reverse()) !== clues.bottom[c]) return false;
+    }
+    return true;
+  }
+
+  function backtrack(r, c) {
+    if (solutions >= limit) return;
+    if (r === n) {
+      if (allColsOk()) solutions++;
+      return;
+    }
+    const nr = c === n - 1 ? r + 1 : r;
+    const nc = c === n - 1 ? 0 : c + 1;
+    for (let v = 1; v <= n; v++) {
+      if (grid[r].includes(v)) continue;
+      let colOk = true;
+      for (let rr = 0; rr < r; rr++) if (grid[rr][c] === v) { colOk = false; break; }
+      if (!colOk) continue;
+      grid[r][c] = v;
+      let proceed = true;
+      if (c === n - 1) proceed = rowClueOk(r);
+      if (proceed) backtrack(nr, nc);
+      grid[r][c] = 0;
+      if (solutions >= limit) return;
+    }
+  }
+  backtrack(0, 0);
+  return solutions;
+}
+
+function generateSkyscraperPuzzle(n) {
+  let guard = 0;
+  while (guard < 80) {
+    guard++;
+    const solution = makeLatinSquare(n);
+    const clues = computeSkyClues(solution, n);
+    if (countSkySolutions(clues, n, 2) === 1) return { clues, solution };
+  }
+  const solution = makeLatinSquare(n);
+  return { clues: computeSkyClues(solution, n), solution };
+}
+
+function skyscraperMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Kenar ipuçlarına bakarak ilk ızgaranı doldur, nasıl gittiğini burada görelim.";
+  const avgMs = history.reduce((s, h) => s + h.timeMs, 0) / history.length;
+  const avgMistakes = history.reduce((s, h) => s + h.mistakes, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.timeMs));
+  if (avgMs <= 240000 && avgMistakes <= 1) return `Kenar ipuçlarını hızlıca çözüyorsun — ortalama ${formatClock(avgMs)}, ortalama ${avgMistakes.toFixed(1)} hata. Görünürlük mantığını iyi kavramışsın.`;
+  if (avgMs <= 420000) return `Ortalama ${formatClock(avgMs)} sürede tamamlıyorsun, en iyi çözümün ${formatClock(best)}. İyi bir tempo.`;
+  return `Ortalama ${formatClock(avgMs)} sürüyor — bu bulmaca ilk başta kafa karıştırıcı gelebilir. İpucu: bir kenardaki "1" ipucu, o sırada en uzun binanın hemen o kenarda olduğu anlamına gelir.`;
+}
+
+function SkyscraperGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | loading | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [n, setN] = useState(SKYSCRAPER_DIFFICULTIES[0].n);
+  const [clues, setClues] = useState(null);
+  const [solution, setSolution] = useState(null);
+  const [grid, setGrid] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [mistakes, setMistakes] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const timerRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.skyscrapers.accent;
+  const ACCENT_SOFT = GAME_THEMES.skyscrapers.soft;
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  function startGame() {
+    setPhase("loading");
+    setTimeout(() => {
+      const diff = SKYSCRAPER_DIFFICULTIES[difficultyIndex];
+      const { clues: c, solution: s } = generateSkyscraperPuzzle(diff.n);
+      setN(diff.n);
+      setClues(c);
+      setSolution(s);
+      setGrid(Array.from({ length: diff.n }, () => Array(diff.n).fill(0)));
+      setSelected(null);
+      setMistakes(0);
+      setStartTime(Date.now());
+      setElapsedMs(0);
+      setPhase("playing");
+    }, 50);
+  }
+
+  useEffect(() => {
+    if (phase === "playing") {
+      timerRef.current = setInterval(() => setElapsedMs(Date.now() - startTime), 500);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [phase, startTime]);
+
+  function selectCell(r, c) {
+    if (phase !== "playing") return;
+    setSelected({ r, c });
+  }
+
+  function pressDigit(v) {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    const next = grid.map((row) => row.slice());
+    next[r][c] = v;
+    setGrid(next);
+    if (solution[r][c] !== v) setMistakes((m) => m + 1);
+    const complete = next.every((row, ri) => row.every((val, ci) => val === solution[ri][ci]));
+    if (complete) {
+      clearInterval(timerRef.current);
+      const timeMs = Date.now() - startTime;
+      const entry = { difficulty: SKYSCRAPER_DIFFICULTIES[difficultyIndex].label, timeMs, mistakes, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      trackEvent("game_round_complete", { game: "skyscrapers", difficulty: entry.difficulty, timeMs, mistakes });
+      setPhase("result");
+    }
+  }
+
+  function eraseCell() {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    const next = grid.map((row) => row.slice());
+    next[r][c] = 0;
+    setGrid(next);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestTime = history.length ? Math.min(...history.map((h) => h.timeMs)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Kule Bulmaca" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {SKYSCRAPER_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label} ({d.n}x{d.n})</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 310, marginBottom: 24, lineHeight: 1.6 }}>
+            Her hücreye 1 ile ızgara boyutu arasında bir "bina yüksekliği" gir. Her satırda ve sütunda her yükseklik yalnızca bir kez geçmeli. Kenardaki sayılar, o yönden bakınca kaç binanın görülebildiğini gösterir — yüksek bir bina arkasındaki kısa binaları gizler. Sudoku'dan farklı olarak hiçbir hücre önceden dolu gelmiyor, tamamen ipuçlarından çıkarım yapman gerekiyor.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestTime !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatClock(bestTime)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "loading" && (
+        <p style={{ color: PALETTE.dim, fontSize: 14, marginTop: 40 }}>Bulmaca hazırlanıyor…</p>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && grid && clues && (
+        <>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
+            <span>Süre: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+            <span>Hata: <span style={{ color: mistakes > 0 ? PALETTE.bad : PALETTE.good, fontWeight: 600 }}>{mistakes}</span></span>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: `repeat(${n + 2}, 1fr)`,
+            width: "100%", maxWidth: "min(420px, 92vw)", aspectRatio: "1",
+            marginBottom: 18,
+          }}>
+            {Array.from({ length: (n + 2) * (n + 2) }, (_, i) => {
+              const rowIdx = Math.floor(i / (n + 2));
+              const colIdx = i % (n + 2);
+              const isCorner = (rowIdx === 0 || rowIdx === n + 1) && (colIdx === 0 || colIdx === n + 1);
+              const isTopClue = rowIdx === 0 && colIdx > 0 && colIdx < n + 1;
+              const isBottomClue = rowIdx === n + 1 && colIdx > 0 && colIdx < n + 1;
+              const isLeftClue = colIdx === 0 && rowIdx > 0 && rowIdx < n + 1;
+              const isRightClue = colIdx === n + 1 && rowIdx > 0 && rowIdx < n + 1;
+
+              if (isCorner) return <div key={i} />;
+              if (isTopClue) return (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.faint, fontSize: 13, fontWeight: 600 }}>
+                  {clues.top[colIdx - 1] || ""}
+                </div>
+              );
+              if (isBottomClue) return (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.faint, fontSize: 13, fontWeight: 600 }}>
+                  {clues.bottom[colIdx - 1] || ""}
+                </div>
+              );
+              if (isLeftClue) return (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.faint, fontSize: 13, fontWeight: 600 }}>
+                  {clues.left[rowIdx - 1] || ""}
+                </div>
+              );
+              if (isRightClue) return (
+                <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", color: PALETTE.faint, fontSize: 13, fontWeight: 600 }}>
+                  {clues.right[rowIdx - 1] || ""}
+                </div>
+              );
+
+              const r = rowIdx - 1, c = colIdx - 1;
+              const val = grid[r][c];
+              const isSelected = selected && selected.r === r && selected.c === c;
+              const isWrong = val !== 0 && solution[r][c] !== val;
+              return (
+                <button key={i} type="button" onClick={() => selectCell(r, c)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: isSelected ? hexToRgba(ACCENT, 0.2) : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${PALETTE.border}`,
+                    color: isWrong ? PALETTE.bad : ACCENT,
+                    fontWeight: 700, fontSize: "clamp(15px, 4vw, 22px)", cursor: "pointer", padding: 0,
+                  }}>
+                  {val !== 0 ? val : ""}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 6, width: "100%", maxWidth: "min(340px, 80vw)", marginBottom: 12 }}>
+            {Array.from({ length: n }, (_, i) => i + 1).map((v) => (
+              <button key={v} type="button" onClick={() => pressDigit(v)}
+                style={{ minHeight: 46, borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: "clamp(15px, 4vw, 19px)", fontWeight: 600, cursor: "pointer" }}>
+                {v}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={eraseCell}
+            style={{ padding: "10px 24px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 14, cursor: "pointer" }}>
+            Sil
+          </button>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatClock(elapsedMs)}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>{mistakes} hata · {SKYSCRAPER_DIFFICULTIES[difficultyIndex].label}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.good, marginBottom: 24 }}>Tamamlandı!</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- SIRA BULMA (N-BACK) ---------------- */
+
+const NBACK_SYMS = ["A", "B", "C", "D", "E", "F"];
+const NBACK_TOTAL = 14;
+
+function generateNbackSequence() {
+  const seq = [];
+  for (let i = 0; i < NBACK_TOTAL; i++) {
+    if (i >= 2 && Math.random() < 0.35) seq.push(seq[i - 2]);
+    else seq.push(NBACK_SYMS[Math.floor(Math.random() * NBACK_SYMS.length)]);
+  }
+  return seq;
+}
+
+function nbackMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. 2 önceki sembolle şimdikini karşılaştırmayı ilk turunda dene.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 85) return `Ortalama %${avg.toFixed(0)} doğruluk — kısa süreli hafızan ve dikkatin gerçekten güçlü. En iyi turun %${best.toFixed(0)}.`;
+  if (avg >= 65) return `Ortalama %${avg.toFixed(0)} doğruluk, fena değil. Bu test zihinsel olarak yorucudur, düzenli pratikle skorun yükselir.`;
+  return `Ortalama %${avg.toFixed(0)} — 2-geri testi zor bir test, çoğu insan ilk denemelerde zorlanır. Sembole değil, 2 önceki sembole odaklanmaya çalış.`;
+}
+
+function NbackGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [seq, setSeq] = useState([]);
+  const [index, setIndex] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [decisions, setDecisions] = useState(0);
+  const [feedback, setFeedback] = useState(null); // 'correct' | 'wrong' | null
+  const [result, setResult] = useState(null);
+  const timeoutRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.nback.accent;
+  const ACCENT_SOFT = GAME_THEMES.nback.soft;
+
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+
+  function startGame() {
+    setSeq(generateNbackSequence());
+    setIndex(0);
+    setCorrectCount(0);
+    setDecisions(0);
+    setFeedback(null);
+    setResult(null);
+    setPhase("playing");
+  }
+
+  useEffect(() => {
+    if (phase === "playing" && index < 2) {
+      timeoutRef.current = setTimeout(() => setIndex((i) => i + 1), 900);
+    }
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, [phase, index]);
+
+  function respond(choseSame) {
+    if (phase !== "playing" || index < 2) return;
+    const isMatch = seq[index] === seq[index - 2];
+    const correct = choseSame === isMatch;
+    setFeedback(correct ? "correct" : "wrong");
+    setDecisions((d) => d + 1);
+    if (correct) setCorrectCount((c) => c + 1);
+
+    setTimeout(() => {
+      setFeedback(null);
+      const next = index + 1;
+      if (next >= NBACK_TOTAL) {
+        const finalCorrect = correct ? correctCount + 1 : correctCount;
+        const finalDecisions = decisions + 1;
+        const pct = (finalCorrect / finalDecisions) * 100;
+        const entry = { pct, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setResult(entry);
+        trackEvent("game_round_complete", { game: "nback", pct: Math.round(pct) });
+        setPhase("result");
+      } else {
+        setIndex(next);
+      }
+    }, 300);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const bestPct = history.length ? Math.max(...history.map((h) => h.pct)) : null;
+  const showButtons = phase === "playing" && index >= 2 && !feedback;
+
+  return (
+    <Shell>
+      <TopBar title="Sıra Bulma" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Ekranda sırayla harfler belirecek. Her harften sonra, o harfin 2 önce gösterilen harfle aynı olup olmadığını söylemen gerekiyor. İlk 2 harf sadece tanıtım, onlar için bir şey yapmana gerek yok.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestPct !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{bestPct.toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 20 }}>
+            {index < 2 ? `Hazırlan… (${index + 1}/2)` : `${index - 1} / ${NBACK_TOTAL - 2}`}
+          </div>
+          <div style={{
+            width: 160, height: 160, borderRadius: 20, marginBottom: 32,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: `1px solid ${feedback === "correct" ? PALETTE.good : feedback === "wrong" ? PALETTE.bad : PALETTE.border}`,
+            background: feedback === "correct" ? "rgba(143,184,154,0.1)" : feedback === "wrong" ? "rgba(201,112,94,0.1)" : "rgba(255,255,255,0.02)",
+          }}>
+            <div style={{ fontSize: 56, fontWeight: 800, color: PALETTE.bright }}>{seq[index]}</div>
+          </div>
+
+          {showButtons && (
+            <div style={{ display: "flex", gap: 14, width: "100%", maxWidth: 300 }}>
+              <button type="button" onClick={() => respond(true)}
+                style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                Aynı
+              </button>
+              <button type="button" onClick={() => respond(false)}
+                style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+                Farklı
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{result.pct.toFixed(0)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text}</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- DENGE NOKTASI ---------------- */
+
+const BALANCE_PERIOD_MS = 2200;
+
+function balanceMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Nokta iki uç arasında gidip geliyor, tam ortadan geçtiği anı ilk turunda yakalamayı dene.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 92) return `Ortalama %${avg.toFixed(0)} doğrulukla neredeyse her seferinde tam ortayı yakalıyorsun. Görsel-zamansal öngörün çok güçlü.`;
+  if (avg >= 75) return `Ortalama %${avg.toFixed(0)} doğruluk gayet iyi. En iyi turun %${best.toFixed(0)} — hareketi tahmin etmeye başlamışsın.`;
+  return `Ortalama %${avg.toFixed(0)} — bu tür bir öngörü pratikle gelişiyor, noktanın ritmine alıştıkça isabetin artacak.`;
+}
+
+function BalanceGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [pos, setPos] = useState(0);
+  const [result, setResult] = useState(null);
+  const startTimeRef = useRef(0);
+  const rafRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.balance.accent;
+  const ACCENT_SOFT = GAME_THEMES.balance.soft;
+
+  useEffect(() => () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); }, []);
+
+  function startGame() {
+    setResult(null);
+    startTimeRef.current = Date.now();
+    setPhase("playing");
+    const tick = () => {
+      const elapsed = Date.now() - startTimeRef.current;
+      const p = (Math.sin((elapsed / BALANCE_PERIOD_MS) * 2 * Math.PI - Math.PI / 2) + 1) / 2 * 100;
+      setPos(p);
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  function handleTap() {
+    if (phase !== "playing") return;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    const distance = Math.abs(pos - 50);
+    const pct = Math.max(0, 100 - distance * 2);
+    const entry = { pct, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    setResult(entry);
+    trackEvent("game_round_complete", { game: "balance", pct: Math.round(pct) });
+    setPhase("result");
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const bestPct = history.length ? Math.max(...history.map((h) => h.pct)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Denge Noktası" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Bir nokta iki uç arasında sürekli gidip geliyor. Tam ortadan geçtiğini düşündüğün anda ekrana dokun. Ne kadar yakınsan o kadar yüksek puan alırsın.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestPct !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{bestPct.toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && (
+        <button type="button" onClick={handleTap}
+          style={{ width: "100%", maxWidth: 320, padding: 0, background: "none", border: "none", cursor: "pointer" }}>
+          <div style={{ position: "relative", width: "100%", height: 4, background: PALETTE.border, borderRadius: 2, marginTop: 100, marginBottom: 100 }}>
+            <div style={{ position: "absolute", left: "50%", top: -10, bottom: -10, width: 1, background: "rgba(255,255,255,0.15)" }} />
+            <div style={{
+              position: "absolute", left: `${pos}%`, top: "50%", width: 22, height: 22,
+              borderRadius: "50%", background: ACCENT, transform: "translate(-50%, -50%)",
+              boxShadow: `0 0 16px ${hexToRgba(ACCENT, 0.5)}`,
+            }} />
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center" }}>Tam ortadan geçerken dokun</p>
+        </button>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{result.pct.toFixed(0)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text}</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- HIZLI SIRALAMA ---------------- */
+
+function generateQuicksortLayout() {
+  const nums = shuffleArr([1,2,3,4,5,6,7,8,9]);
+  return nums;
+}
+
+function quicksortMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. 1'den 9'a kadar sayılara sırayla ne kadar hızlı dokunabildiğini ilk turunda görelim.";
+  const avgMs = history.reduce((s, h) => s + h.timeMs, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.timeMs));
+  if (avgMs <= 3500) return `Ortalama ${formatMs(Math.round(avgMs))}ms — çok hızlı bir görsel tarama ve işlem hızın var. En iyi turun ${formatMs(best)}ms.`;
+  if (avgMs <= 6000) return `Ortalama ${formatMs(Math.round(avgMs))}ms gayet iyi bir tempo. Gözünle sırayı önceden planlamaya çalışmak süreni kısaltabilir.`;
+  return `Ortalama ${formatMs(Math.round(avgMs))}ms — pratikle bu süre hızla kısalıyor, gözünü bir sonraki sayıya önceden atmayı dene.`;
+}
+
+function QuicksortGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [layout, setLayout] = useState([]);
+  const [expected, setExpected] = useState(1);
+  const [done, setDone] = useState([]);
+  const [wrongFlash, setWrongFlash] = useState(null);
+  const [result, setResult] = useState(null);
+  const startTimeRef = useRef(0);
+  const wrongTimeoutRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.quicksort.accent;
+  const ACCENT_SOFT = GAME_THEMES.quicksort.soft;
+
+  useEffect(() => () => { if (wrongTimeoutRef.current) clearTimeout(wrongTimeoutRef.current); }, []);
+
+  function startGame() {
+    setLayout(generateQuicksortLayout());
+    setExpected(1);
+    setDone([]);
+    setWrongFlash(null);
+    setResult(null);
+    setPhase("playing");
+    startTimeRef.current = Date.now();
+  }
+
+  function pressCell(num) {
+    if (phase !== "playing") return;
+    if (num === expected) {
+      const nextDone = [...done, num];
+      setDone(nextDone);
+      if (num === 9) {
+        const timeMs = Date.now() - startTimeRef.current;
+        const entry = { timeMs, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setResult(entry);
+        trackEvent("game_round_complete", { game: "quicksort", timeMs });
+        setPhase("result");
+      } else {
+        setExpected(num + 1);
+      }
+    } else {
+      setWrongFlash(num);
+      wrongTimeoutRef.current = setTimeout(() => setWrongFlash(null), 200);
+    }
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestTime = history.length ? Math.min(...history.map((h) => h.timeMs)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Hızlı Sıralama" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            Karışık sırada duran 1'den 9'a kadar sayılar göreceksin. Onlara doğru sırayla, olabildiğince hızlı dokun. Yanlış sayıya dokunursan bir şey olmaz, sadece sıradaki doğru sayıyı bulmaya devam et.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestTime !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatMs(bestTime)}ms</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 20 }}>Sırada: <span style={{ color: ACCENT, fontWeight: 700 }}>{expected}</span></div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10, width: "100%", maxWidth: "min(320px, 80vw)" }}>
+            {layout.map((num) => {
+              const isDone = done.includes(num);
+              const isWrong = wrongFlash === num;
+              return (
+                <button key={num} type="button" onClick={() => pressCell(num)} disabled={isDone}
+                  style={{
+                    aspectRatio: "1", borderRadius: 14, border: `1px solid ${isWrong ? PALETTE.bad : PALETTE.border}`,
+                    background: isDone ? "rgba(139,201,91,0.12)" : isWrong ? "rgba(201,112,94,0.15)" : "rgba(255,255,255,0.03)",
+                    color: isDone ? PALETTE.good : PALETTE.bright,
+                    fontSize: "clamp(20px, 6vw, 28px)", fontWeight: 700, cursor: isDone ? "default" : "pointer",
+                    opacity: isDone ? 0.5 : 1,
+                  }}>
+                  {num}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {phase === "result" && result && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatMs(result.timeMs)}ms</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.good, marginBottom: 24 }}>Tamamlandı!</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- ÇİZGİ KIYASI ---------------- */
+
+const LINECOMPARE_ROUNDS = 8;
+
+function lineCompareMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. İki çizgiden hangisinin daha uzun olduğunu tahmin ederek başla.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 90) return `Ortalama %${avg.toFixed(0)} doğruluk — göz kararın çok keskin, ince farkları bile fark ediyorsun.`;
+  if (avg >= 70) return `Ortalama %${avg.toFixed(0)} doğruluk iyi. En iyi turun %${best.toFixed(0)} — küçük farkları yakalamaya devam et.`;
+  return `Ortalama %${avg.toFixed(0)} — bazı turlarda farklar bilerek çok küçük tutuluyor, bu yüzden zorlanman normal.`;
+}
+
+function LineCompareGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [round, setRound] = useState(0);
+  const [lengths, setLengths] = useState([100, 100]);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [feedback, setFeedback] = useState(null);
+  const [result, setResult] = useState(null);
+
+  const ACCENT = GAME_THEMES.linecompare.accent;
+  const ACCENT_SOFT = GAME_THEMES.linecompare.soft;
+
+  function newRoundLengths() {
+    const base = 90 + Math.random() * 100;
+    const delta = 8 + Math.random() * 45;
+    const first = base;
+    const second = Math.random() < 0.5 ? base + delta : Math.max(40, base - delta);
+    return Math.random() < 0.5 ? [first, second] : [second, first];
+  }
+
+  function startGame() {
+    setRound(0);
+    setCorrectCount(0);
+    setFeedback(null);
+    setResult(null);
+    setLengths(newRoundLengths());
+    setPhase("playing");
+  }
+
+  function choose(side) {
+    if (phase !== "playing" || feedback) return;
+    const longerSide = lengths[0] >= lengths[1] ? 0 : 1;
+    const correct = side === longerSide;
+    setFeedback(correct ? "correct" : "wrong");
+    const nextCorrect = correct ? correctCount + 1 : correctCount;
+    setCorrectCount(nextCorrect);
+
+    setTimeout(() => {
+      const next = round + 1;
+      if (next >= LINECOMPARE_ROUNDS) {
+        const pct = (nextCorrect / LINECOMPARE_ROUNDS) * 100;
+        const entry = { pct, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setResult(entry);
+        trackEvent("game_round_complete", { game: "linecompare", pct: Math.round(pct) });
+        setPhase("result");
+      } else {
+        setRound(next);
+        setLengths(newRoundLengths());
+        setFeedback(null);
+      }
+    }, 350);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const bestPct = history.length ? Math.max(...history.map((h) => h.pct)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Çizgi Kıyası" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            İki çizgi göreceksin, hangisi daha uzunsa ona dokun. {LINECOMPARE_ROUNDS} tur sürüyor, bazı farklar çok ince olacak.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestPct !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{bestPct.toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 24 }}>{round + 1} / {LINECOMPARE_ROUNDS}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 24, width: "100%", maxWidth: 300 }}>
+            {[0, 1].map((side) => (
+              <button key={side} type="button" onClick={() => choose(side)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  padding: "24px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`,
+                  background: feedback ? (side === (lengths[0] >= lengths[1] ? 0 : 1) ? "rgba(143,184,154,0.1)" : "rgba(201,112,94,0.1)") : "rgba(255,255,255,0.02)",
+                  cursor: feedback ? "default" : "pointer",
+                }}>
+                <div style={{ height: 10, width: `${lengths[side]}px`, maxWidth: "80%", background: ACCENT, borderRadius: 6 }} />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{result.pct.toFixed(0)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text}</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- TEK FARKLI ---------------- */
+
+function oddOneOutLabel(ms) {
+  if (ms < 1500) return { text: "Çok hızlı", color: PALETTE.good };
+  if (ms < 3000) return { text: "Hızlı", color: PALETTE.mid };
+  if (ms < 5000) return { text: "Ortalama", color: PALETTE.amber };
+  return { text: "Sakin bir tarama", color: PALETTE.bad };
+}
+
+function oddOneOutMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Aralarındaki farklı olanı bulmayı ilk turunda dene.";
+  const avg = history.reduce((s, h) => s + h.ms, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.ms));
+  if (avg <= 2000) return `Ortalama ${formatMs(Math.round(avg))}ms — görsel tarama hızın gerçekten yüksek. En iyi turun ${formatMs(best)}ms.`;
+  if (avg <= 3800) return `Ortalama ${formatMs(Math.round(avg))}ms gayet iyi bir tarama hızı.`;
+  return `Ortalama ${formatMs(Math.round(avg))}ms — farkı bulmak için gözünü sistematik olarak taramaya çalışmak süreni kısaltabilir.`;
+}
+
+function generateOddOneOut() {
+  const size = 16;
+  const hue = Math.floor(Math.random() * 360);
+  const baseColor = `hsl(${hue}, 45%, 55%)`;
+  const oddColor = `hsl(${hue}, 45%, 78%)`;
+  const oddIndex = Math.floor(Math.random() * size);
+  return { size, baseColor, oddColor, oddIndex };
+}
+
+function OddOneOutGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [puzzle, setPuzzle] = useState(null);
+  const [result, setResult] = useState(null);
+  const [wrongFlash, setWrongFlash] = useState(null);
+  const startTimeRef = useRef(0);
+  const wrongTimeoutRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.oddoneout.accent;
+  const ACCENT_SOFT = GAME_THEMES.oddoneout.soft;
+
+  useEffect(() => () => { if (wrongTimeoutRef.current) clearTimeout(wrongTimeoutRef.current); }, []);
+
+  function startGame() {
+    setPuzzle(generateOddOneOut());
+    setResult(null);
+    setWrongFlash(null);
+    setPhase("playing");
+    startTimeRef.current = Date.now();
+  }
+
+  function pressCell(i) {
+    if (phase !== "playing" || !puzzle) return;
+    if (i === puzzle.oddIndex) {
+      const ms = Date.now() - startTimeRef.current;
+      const entry = { ms, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      setResult(entry);
+      trackEvent("game_round_complete", { game: "oddoneout", ms });
+      setPhase("result");
+    } else {
+      setWrongFlash(i);
+      wrongTimeoutRef.current = setTimeout(() => setWrongFlash(null), 200);
+    }
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const label = result ? oddOneOutLabel(result.ms) : null;
+  const bestMs = history.length ? Math.min(...history.map((h) => h.ms)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Tek Farklı" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 28, lineHeight: 1.6 }}>
+            16 şeklin arasında rengi hafifçe farklı olan tek bir tane var. Onu bulduğun an dokun, ne kadar hızlı olduğun ölçülür.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestMs !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatMs(bestMs)}ms</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && puzzle && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, width: "100%", maxWidth: "min(320px, 80vw)" }}>
+          {Array.from({ length: puzzle.size }, (_, i) => (
+            <button key={i} type="button" onClick={() => pressCell(i)}
+              style={{
+                aspectRatio: "1", borderRadius: "50%", border: wrongFlash === i ? `2px solid ${PALETTE.bad}` : "none",
+                background: i === puzzle.oddIndex ? puzzle.oddColor : puzzle.baseColor,
+                cursor: "pointer",
+              }} />
+          ))}
+        </div>
+      )}
+
+      {phase === "result" && result && label && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatMs(result.ms)}ms</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: label.color, marginBottom: 24 }}>{label.text}</div>
           <button type="button" onClick={playAgain}
             style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
@@ -1920,6 +3207,13 @@ function Report({ type, history, onBack }) {
     sudoku: "Sudoku Raporu",
     "2048": "2048 Raporu",
     minesweeper: "Mayın Tarlası Raporu",
+    tetris: "Tetris Raporu",
+    skyscrapers: "Kule Bulmaca Raporu",
+    nback: "Sıra Bulma Raporu",
+    balance: "Denge Noktası Raporu",
+    quicksort: "Hızlı Sıralama Raporu",
+    linecompare: "Çizgi Kıyası Raporu",
+    oddoneout: "Tek Farklı Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -1931,6 +3225,13 @@ function Report({ type, history, onBack }) {
     sudoku: sudokuMessage,
     "2048": game2048Message,
     minesweeper: minesweeperMessage,
+    tetris: tetrisMessage,
+    skyscrapers: skyscraperMessage,
+    nback: nbackMessage,
+    balance: balanceMessage,
+    quicksort: quicksortMessage,
+    linecompare: lineCompareMessage,
+    oddoneout: oddOneOutMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -1962,6 +3263,21 @@ function Report({ type, history, onBack }) {
       const wins = history.filter((h) => h.outcome === "won");
       best = wins.length ? formatClock(Math.min(...wins.map((h) => h.timeMs))) : "—";
       avg = `%${((wins.length / count) * 100).toFixed(0)}`;
+    } else if (type === "tetris") {
+      best = Math.max(...history.map((h) => h.score)).toLocaleString("tr-TR");
+      avg = Math.round(history.reduce((s, h) => s + h.score, 0) / count).toLocaleString("tr-TR");
+    } else if (type === "skyscrapers") {
+      best = formatClock(Math.min(...history.map((h) => h.timeMs)));
+      avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
+    } else if (type === "nback" || type === "balance" || type === "linecompare") {
+      best = Math.max(...history.map((h) => h.pct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.pct, 0) / count).toFixed(0) + "%";
+    } else if (type === "quicksort") {
+      best = formatMs(Math.min(...history.map((h) => h.timeMs))) + "ms";
+      avg = formatMs(Math.round(history.reduce((s, h) => s + h.timeMs, 0) / count)) + "ms";
+    } else if (type === "oddoneout") {
+      best = formatMs(Math.min(...history.map((h) => h.ms))) + "ms";
+      avg = formatMs(Math.round(history.reduce((s, h) => s + h.ms, 0) / count)) + "ms";
     }
   }
 
@@ -2054,6 +3370,28 @@ function Report({ type, history, onBack }) {
                     <span style={{ color: h.outcome === "won" ? PALETTE.good : PALETTE.bad }}>{h.outcome === "won" ? "Kazandı" : "Kaybetti"}</span>
                   </>
                 )}
+                {type === "tetris" && (
+                  <>
+                    <span className="mono">{h.score.toLocaleString("tr-TR")}</span>
+                    <span style={{ color: GAME_THEMES.tetris.accent }}>seviye {h.level} · {h.lines} sıra</span>
+                  </>
+                )}
+                {type === "skyscrapers" && (
+                  <>
+                    <span>{h.difficulty}</span>
+                    <span className="mono">{formatClock(h.timeMs)}</span>
+                    <span style={{ color: h.mistakes === 0 ? PALETTE.good : PALETTE.amber }}>{h.mistakes} hata</span>
+                  </>
+                )}
+                {(type === "nback" || type === "balance" || type === "linecompare") && (
+                  <span style={{ color: accuracyLabel(h.pct).color }}>%{h.pct.toFixed(0)}</span>
+                )}
+                {type === "quicksort" && (
+                  <span className="mono">{formatMs(h.timeMs)}ms</span>
+                )}
+                {type === "oddoneout" && (
+                  <span className="mono">{formatMs(h.ms)}ms</span>
+                )}
               </div>
             ))}
           </div>
@@ -2076,6 +3414,13 @@ function App() {
   const [sudokuHistory, setSudokuHistory] = useState([]);
   const [game2048History, setGame2048History] = useState([]);
   const [minesweeperHistory, setMinesweeperHistory] = useState([]);
+  const [tetrisHistory, setTetrisHistory] = useState([]);
+  const [skyscraperHistory, setSkyscraperHistory] = useState([]);
+  const [nbackHistory, setNbackHistory] = useState([]);
+  const [balanceHistory, setBalanceHistory] = useState([]);
+  const [quicksortHistory, setQuicksortHistory] = useState([]);
+  const [linecompareHistory, setLinecompareHistory] = useState([]);
+  const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
 
   return (
     <>
@@ -2086,6 +3431,9 @@ function App() {
           onSelectGame={setView}
           icHistory={icHistory} reactionHistory={reactionHistory}
           memoryHistory={memoryHistory} countHistory={countHistory} stroopHistory={stroopHistory}
+          nbackHistory={nbackHistory} balanceHistory={balanceHistory}
+          quicksortHistory={quicksortHistory} linecompareHistory={linecompareHistory}
+          oddoneoutHistory={oddoneoutHistory}
         />
       )}
       {view === "cat-puzzles" && (
@@ -2095,6 +3443,8 @@ function App() {
           sudokuHistory={sudokuHistory}
           game2048History={game2048History}
           minesweeperHistory={minesweeperHistory}
+          tetrisHistory={tetrisHistory}
+          skyscraperHistory={skyscraperHistory}
         />
       )}
       {view === "innerclock" && (
@@ -2154,6 +3504,55 @@ function App() {
           history={minesweeperHistory} setHistory={setMinesweeperHistory}
         />
       )}
+      {view === "tetris" && (
+        <TetrisGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-tetris")}
+          history={tetrisHistory} setHistory={setTetrisHistory}
+        />
+      )}
+      {view === "skyscrapers" && (
+        <SkyscraperGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-skyscrapers")}
+          history={skyscraperHistory} setHistory={setSkyscraperHistory}
+        />
+      )}
+      {view === "nback" && (
+        <NbackGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-nback")}
+          history={nbackHistory} setHistory={setNbackHistory}
+        />
+      )}
+      {view === "balance" && (
+        <BalanceGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-balance")}
+          history={balanceHistory} setHistory={setBalanceHistory}
+        />
+      )}
+      {view === "quicksort" && (
+        <QuicksortGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-quicksort")}
+          history={quicksortHistory} setHistory={setQuicksortHistory}
+        />
+      )}
+      {view === "linecompare" && (
+        <LineCompareGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-linecompare")}
+          history={linecompareHistory} setHistory={setLinecompareHistory}
+        />
+      )}
+      {view === "oddoneout" && (
+        <OddOneOutGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-oddoneout")}
+          history={oddoneoutHistory} setHistory={setOddoneoutHistory}
+        />
+      )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
       {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
       {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
@@ -2163,6 +3562,13 @@ function App() {
       {view === "report-sudoku" && <Report type="sudoku" history={sudokuHistory} onBack={() => setView("sudoku")} />}
       {view === "report-2048" && <Report type="2048" history={game2048History} onBack={() => setView("2048")} />}
       {view === "report-minesweeper" && <Report type="minesweeper" history={minesweeperHistory} onBack={() => setView("minesweeper")} />}
+      {view === "report-tetris" && <Report type="tetris" history={tetrisHistory} onBack={() => setView("tetris")} />}
+      {view === "report-skyscrapers" && <Report type="skyscrapers" history={skyscraperHistory} onBack={() => setView("skyscrapers")} />}
+      {view === "report-nback" && <Report type="nback" history={nbackHistory} onBack={() => setView("nback")} />}
+      {view === "report-balance" && <Report type="balance" history={balanceHistory} onBack={() => setView("balance")} />}
+      {view === "report-quicksort" && <Report type="quicksort" history={quicksortHistory} onBack={() => setView("quicksort")} />}
+      {view === "report-linecompare" && <Report type="linecompare" history={linecompareHistory} onBack={() => setView("linecompare")} />}
+      {view === "report-oddoneout" && <Report type="oddoneout" history={oddoneoutHistory} onBack={() => setView("oddoneout")} />}
     </>
   );
 }
