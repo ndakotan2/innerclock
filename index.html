@@ -230,7 +230,7 @@ function playTestBeep(setBeepStatus) {
   }
 }
 
-function Home({ onSelect, musicOn, setMusicOn }) {
+function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
   const [beepStatus, setBeepStatus] = useState(null);
   return (
     <Shell>
@@ -244,6 +244,9 @@ function Home({ onSelect, musicOn, setMusicOn }) {
         </button>
         <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Innerclock</div>
         <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Ne oynamak istersin?</h1>
+        {musicStatus && (
+          <p style={{ color: PALETTE.faint, fontSize: 10, marginTop: 6 }}>🎵 durum: {musicStatus}</p>
+        )}
         <button type="button" onClick={() => playTestBeep(setBeepStatus)}
           style={{
             marginTop: 14, padding: "8px 16px", borderRadius: 999, border: `1px solid ${PALETTE.border}`,
@@ -3848,79 +3851,10 @@ function Report({ type, history, onBack }) {
 
 /* ---------------- APP ---------------- */
 
-/* ---------------- AMBİYANS MÜZİĞİ ---------------- */
-
-const AMBIENT_CHORDS = [
-  [220.00, 261.63, 329.63, 392.00], // Am9
-  [174.61, 220.00, 261.63, 329.63], // Fmaj7
-  [261.63, 329.63, 392.00, 493.88], // Cmaj9
-  [293.66, 349.23, 440.00, 523.25], // Dm9
-];
-
-function createAmbientPad(ctx, destinationNode) {
-  const baseChord = AMBIENT_CHORDS[0];
-  const oscs = [];
-
-  baseChord.forEach((freq, i) => {
-    const osc = ctx.createOscillator();
-    osc.type = i % 2 === 0 ? "sine" : "triangle";
-    osc.frequency.value = freq;
-
-    const oscGain = ctx.createGain();
-    oscGain.gain.value = 0.2;
-
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.05 + Math.random() * 0.08;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 0.06;
-    lfo.connect(lfoGain);
-    lfoGain.connect(oscGain.gain);
-
-    osc.connect(oscGain);
-    oscGain.connect(destinationNode);
-    osc.start();
-    lfo.start();
-    oscs.push(osc);
-  });
-
-  // Yavaşça değişen akor dizisi — her akor arasında yumuşak, 5 saniyelik geçiş
-  let chordIndex = 0;
-  const chordInterval = setInterval(() => {
-    chordIndex = (chordIndex + 1) % AMBIENT_CHORDS.length;
-    const nextChord = AMBIENT_CHORDS[chordIndex];
-    oscs.forEach((osc, i) => {
-      osc.frequency.linearRampToValueAtTime(nextChord[i], ctx.currentTime + 5);
-    });
-  }, 26000);
-
-  // Ara sıra gelen yumuşak "çıngırak" tonları — mevcut akordan rastgele bir nota, bir oktav yukarı
-  function scheduleSparkle() {
-    const delay = 6000 + Math.random() * 9000;
-    setTimeout(() => {
-      try {
-        const chord = AMBIENT_CHORDS[chordIndex];
-        const note = chord[Math.floor(Math.random() * chord.length)] * 2;
-        const sOsc = ctx.createOscillator();
-        sOsc.type = "sine";
-        sOsc.frequency.value = note;
-        const sGain = ctx.createGain();
-        sGain.gain.setValueAtTime(0, ctx.currentTime);
-        sGain.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 0.03);
-        sGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.8);
-        sOsc.connect(sGain);
-        sGain.connect(destinationNode);
-        sOsc.start();
-        sOsc.stop(ctx.currentTime + 3);
-      } catch (e) {
-        // sparkle çalınamadıysa sessizce geç
-      }
-      scheduleSparkle();
-    }, delay);
-  }
-  scheduleSparkle();
-
-  return oscs;
-}
+// Arka plan müziği: CC0 (kamu malı) lisanslı "Free Fall" - TAD, OpenGameArt.org
+// Kaynak: https://opengameart.org/content/free-fall — lisans: CC0 1.0 Universal
+const BG_MUSIC_URL = "Free%20Fall.mp3";
+const BG_MUSIC_TARGET_VOLUME = 0.35;
 
 function App() {
   const [view, setView] = useState("home");
@@ -3942,47 +3876,69 @@ function App() {
   const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
   const [blockBlastHistory, setBlockBlastHistory] = useState([]);
   const [musicOn, setMusicOn] = useState(true);
-  const audioCtxRef = useRef(null);
-  const masterGainRef = useRef(null);
+  const [musicStatus, setMusicStatus] = useState("henüz başlamadı");
+  const audioElRef = useRef(null);
+  const audioStartedRef = useRef(false);
   const musicOnRef = useRef(true);
 
   useEffect(() => { musicOnRef.current = musicOn; }, [musicOn]);
 
+  function fadeAudioTo(audio, target) {
+    if (!audio) return;
+    const step = () => {
+      const current = audio.volume;
+      if (Math.abs(current - target) < 0.02) {
+        audio.volume = target;
+        return;
+      }
+      audio.volume = current + (target > current ? 0.03 : -0.03);
+      requestAnimationFrame(step);
+    };
+    step();
+  }
+
+  useEffect(() => {
+    const audio = audioElRef.current;
+    if (!audio) return;
+    const onError = () => {
+      const code = audio.error ? audio.error.code : "?";
+      setMusicStatus(`hata (kod ${code}) — dosyaya erişilemiyor`);
+    };
+    const onCanPlay = () => setMusicStatus((s) => (s.startsWith("çalıyor") ? s : "yüklendi, çalmaya hazır"));
+    const onPlaying = () => setMusicStatus(`çalıyor — ses: ${audio.volume.toFixed(2)}`);
+    const onStalled = () => setMusicStatus("yükleme takıldı (stalled)");
+    audio.addEventListener("error", onError);
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("playing", onPlaying);
+    audio.addEventListener("stalled", onStalled);
+    return () => {
+      audio.removeEventListener("error", onError);
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("playing", onPlaying);
+      audio.removeEventListener("stalled", onStalled);
+    };
+  }, []);
+
   useEffect(() => {
     function unlockAudio() {
-      if (audioCtxRef.current) return;
-      try {
-        const Ctx = window.AudioContext || window.webkitAudioContext;
-        const ctx = new Ctx();
-        const filter = ctx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.frequency.value = 900;
-        const masterGain = ctx.createGain();
-        masterGain.gain.setValueAtTime(0, ctx.currentTime);
-        filter.connect(masterGain);
-        masterGain.connect(ctx.destination);
-        createAmbientPad(ctx, filter);
-        audioCtxRef.current = ctx;
-        masterGainRef.current = masterGain;
-
-        const beginFade = () => {
-          if (musicOnRef.current) {
-            masterGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 3);
-          }
-        };
-        // resume()'un tamamlanmasını beklemeden hemen başlat — bazı tarayıcılarda
-        // bu promise hiç çözülmüyor ve müzik sonsuza kadar sessiz kalıyordu
-        beginFade();
-        if (ctx.state === "suspended" && ctx.resume) {
-          ctx.resume().catch(() => {});
-        }
-
-        document.removeEventListener("pointerdown", unlockAudio);
-        document.removeEventListener("touchend", unlockAudio);
-        document.removeEventListener("click", unlockAudio);
-      } catch (e) {
-        // Web Audio desteklenmiyorsa sessizce geç
+      if (audioStartedRef.current || !audioElRef.current) return;
+      audioStartedRef.current = true;
+      const audio = audioElRef.current;
+      audio.volume = 0;
+      setMusicStatus("play() çağrıldı…");
+      const playPromise = audio.play();
+      if (playPromise && playPromise.then) {
+        playPromise
+          .then(() => setMusicStatus("play() başarılı, ses yükseliyor"))
+          .catch((err) => {
+            audioStartedRef.current = false;
+            setMusicStatus(`play() reddedildi: ${err.name} — ${err.message}`);
+          });
       }
+      if (musicOnRef.current) fadeAudioTo(audio, BG_MUSIC_TARGET_VOLUME);
+      document.removeEventListener("pointerdown", unlockAudio);
+      document.removeEventListener("touchend", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
     }
     document.addEventListener("pointerdown", unlockAudio);
     document.addEventListener("touchend", unlockAudio);
@@ -3995,15 +3951,15 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (masterGainRef.current && audioCtxRef.current) {
-      const target = musicOn ? 0.18 : 0;
-      masterGainRef.current.gain.linearRampToValueAtTime(target, audioCtxRef.current.currentTime + 1.2);
+    if (audioElRef.current && audioStartedRef.current) {
+      fadeAudioTo(audioElRef.current, musicOn ? BG_MUSIC_TARGET_VOLUME : 0);
     }
   }, [musicOn]);
 
   return (
     <>
-      {view === "home" && <Home onSelect={setView} musicOn={musicOn} setMusicOn={setMusicOn} />}
+      <audio ref={audioElRef} src={BG_MUSIC_URL} loop preload="auto" style={{ display: "none" }} />
+      {view === "home" && <Home onSelect={setView} musicOn={musicOn} setMusicOn={setMusicOn} musicStatus={musicStatus} />}
       {view === "cat-mindsports" && (
         <MindSportsList
           onBack={() => setView("home")}
