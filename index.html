@@ -1607,13 +1607,13 @@ function Game2048({ onBack, onReport, history, setHistory }) {
 function dpadBtnStyle(accent) {
   return {
     flex: 1,
-    minWidth: 56,
-    minHeight: 56,
-    borderRadius: 14,
+    minWidth: 84,
+    minHeight: 84,
+    borderRadius: 18,
     border: `1px solid ${PALETTE.border}`,
     background: "rgba(255,255,255,0.03)",
     color: accent,
-    fontSize: "clamp(20px, 6vw, 30px)",
+    fontSize: "clamp(26px, 8vw, 38px)",
     fontWeight: 700,
     cursor: "pointer",
     display: "flex",
@@ -2170,16 +2170,23 @@ function TetrisGame({ onBack, onReport, history, setHistory }) {
             ))}
           </div>
 
-          <div style={{ display: "flex", gap: 10, alignItems: "center", width: "100%", maxWidth: 380, marginBottom: 14 }}>
-            <button type="button" onClick={handleLeft} style={dpadBtnStyle(ACCENT)}>◀</button>
-            <button type="button" onClick={handleRotate} style={dpadBtnStyle(ACCENT)}>⟳</button>
-            <button type="button" onClick={handleRight} style={dpadBtnStyle(ACCENT)}>▶</button>
-            <button type="button" onClick={handleSoftDrop} style={dpadBtnStyle(ACCENT)}>▼</button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", width: "100%", maxWidth: 420, marginBottom: 12 }}>
+            <button type="button" onClick={handleSoftDrop}
+              style={{
+                minWidth: 52, minHeight: 52, borderRadius: 12, border: `1px solid ${PALETTE.border}`,
+                background: "rgba(255,255,255,0.03)", color: ACCENT, fontSize: 18, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>▼</button>
+            <button type="button" onClick={handleHardDrop}
+              style={{ flex: 1, padding: "16px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
+              Bırak (anında düşür)
+            </button>
           </div>
-          <button type="button" onClick={handleHardDrop}
-            style={{ width: "100%", maxWidth: 380, padding: "16px 0", borderRadius: 14, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
-            Bırak (anında düşür)
-          </button>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", width: "100%", maxWidth: 420, marginBottom: 14 }}>
+            <button type="button" onClick={handleRotate} style={dpadBtnStyle(ACCENT)}>⟳</button>
+            <button type="button" onClick={handleLeft} style={dpadBtnStyle(ACCENT)}>◀</button>
+            <button type="button" onClick={handleRight} style={dpadBtnStyle(ACCENT)}>▶</button>
+          </div>
         </>
       )}
 
