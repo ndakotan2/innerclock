@@ -3396,6 +3396,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
   const [finalScore, setFinalScore] = useState(null);
   const [drag, setDrag] = useState(null); // { pieceIndex, x, y, cellSize, anchorR, anchorC, valid }
   const [soundOn, setSoundOn] = useState(true);
+  const [clearingCells, setClearingCells] = useState(new Set());
   const boardRef = useRef(null);
 
   const ACCENT = GAME_THEMES.blockblast.accent;
@@ -3408,6 +3409,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setScore(0);
     setFinalScore(null);
     setDrag(null);
+    setClearingCells(new Set());
     setPhase("playing");
     if (soundOn && window.speechSynthesis) {
       try {
@@ -3433,32 +3435,58 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setPhase("result");
   }
 
-  function commitPlacement(pieceIndex, r, c) {
-    const piece = pieces[pieceIndex];
-    if (!piece || !board || !canPlaceBlockPiece(board, piece.shape, r, c)) return;
-
-    let next = board.map((row) => row.slice());
-    for (const [dx, dy] of piece.shape) next[r + dy][c + dx] = piece.color;
-
-    const { board: cleared, linesCleared } = clearBlockLines(next);
-    const gained = piece.shape.length + linesCleared * 10;
-    const newScore = score + gained;
-
-    if (linesCleared > 0 && soundOn) {
-      playLineClearChime(linesCleared);
-    }
+  function finalizePlacement(newBoard, placedCellCount, linesCleared, pieceIndex, currentScore) {
+    const gained = placedCellCount + linesCleared * 10;
+    const newScore = currentScore + gained;
+    setScore(newScore);
 
     const nextPieces = pieces.slice();
     nextPieces[pieceIndex] = null;
     const allUsed = nextPieces.every((p) => !p);
     const finalPieces = allUsed ? generateBlockPieceSet() : nextPieces;
-
-    setBoard(cleared);
-    setScore(newScore);
     setPieces(finalPieces);
 
-    if (checkGameOver(cleared, finalPieces)) {
+    if (checkGameOver(newBoard, finalPieces)) {
       endGame(newScore);
+    }
+  }
+
+  function commitPlacement(pieceIndex, r, c) {
+    const piece = pieces[pieceIndex];
+    if (!piece || !board || !canPlaceBlockPiece(board, piece.shape, r, c)) return;
+
+    const placed = board.map((row) => row.slice());
+    for (const [dx, dy] of piece.shape) placed[r + dy][c + dx] = piece.color;
+
+    const fullRows = [];
+    const fullCols = [];
+    for (let rr = 0; rr < BLOCK_GRID_SIZE; rr++) if (placed[rr].every((cell) => cell)) fullRows.push(rr);
+    for (let cc = 0; cc < BLOCK_GRID_SIZE; cc++) {
+      let full = true;
+      for (let rr = 0; rr < BLOCK_GRID_SIZE; rr++) if (!placed[rr][cc]) { full = false; break; }
+      if (full) fullCols.push(cc);
+    }
+    const linesCleared = fullRows.length + fullCols.length;
+
+    setBoard(placed);
+
+    if (linesCleared > 0) {
+      const clearing = new Set();
+      for (const rr of fullRows) for (let cc = 0; cc < BLOCK_GRID_SIZE; cc++) clearing.add(`${rr}-${cc}`);
+      for (const cc of fullCols) for (let rr = 0; rr < BLOCK_GRID_SIZE; rr++) clearing.add(`${rr}-${cc}`);
+      setClearingCells(clearing);
+      if (soundOn) playLineClearChime(linesCleared);
+
+      setTimeout(() => {
+        const clearedBoard = placed.map((row) => row.slice());
+        for (const rr of fullRows) for (let cc = 0; cc < BLOCK_GRID_SIZE; cc++) clearedBoard[rr][cc] = null;
+        for (const cc of fullCols) for (let rr = 0; rr < BLOCK_GRID_SIZE; rr++) clearedBoard[rr][cc] = null;
+        setBoard(clearedBoard);
+        setClearingCells(new Set());
+        finalizePlacement(clearedBoard, piece.shape.length, linesCleared, pieceIndex, score);
+      }, 280);
+    } else {
+      finalizePlacement(placed, piece.shape.length, 0, pieceIndex, score);
     }
   }
 
@@ -3544,6 +3572,15 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
             </button>
           </div>
 
+          <style>{`
+            @keyframes blockClearPop {
+              0% { transform: scale(1); filter: brightness(1); opacity: 1; }
+              40% { transform: scale(1.18); filter: brightness(2.4); opacity: 1; }
+              100% { transform: scale(0.6); filter: brightness(2.6); opacity: 0; }
+            }
+            .cell-clearing { animation: blockClearPop 0.28s ease-out forwards; }
+          `}</style>
+
           <div ref={boardRef} style={{
             display: "grid", gridTemplateColumns: `repeat(${BLOCK_GRID_SIZE}, 1fr)`,
             width: "100%", maxWidth: "min(440px, 94vw)", aspectRatio: "1",
@@ -3555,6 +3592,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
               const r = Math.floor(i / BLOCK_GRID_SIZE), c = i % BLOCK_GRID_SIZE;
               const key = `${r}-${c}`;
               const isHighlighted = highlightCells.has(key);
+              const isClearing = clearingCells.has(key);
               let cellStyle = { background: "rgba(255,255,255,0.04)", borderRadius: 4 };
               if (cell) cellStyle = blockCubeStyle(cell);
               else if (isHighlighted) {
@@ -3562,7 +3600,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
                   ? { background: hexToRgba(ACCENT, 0.4), borderRadius: 4, border: `2px solid ${hexToRgba(ACCENT, 0.7)}` }
                   : { background: "rgba(201,112,94,0.35)", borderRadius: 4, border: "2px solid rgba(201,112,94,0.7)" };
               }
-              return <div key={i} style={cellStyle} />;
+              return <div key={i} className={isClearing ? "cell-clearing" : undefined} style={cellStyle} />;
             })}
           </div>
 
