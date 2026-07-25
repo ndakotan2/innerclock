@@ -71,6 +71,7 @@ const GAME_THEMES = {
   quicksort:  { accent: "#8BC95B", soft: "rgba(139,201,91,0.12)" },
   linecompare:{ accent: "#5BD9A8", soft: "rgba(91,217,168,0.12)" },
   oddoneout:  { accent: "#B85BC9", soft: "rgba(184,91,201,0.12)" },
+  blockblast: { accent: "#E0955B", soft: "rgba(224,149,91,0.12)" },
 };
 
 function Shell({ children }) {
@@ -220,7 +221,7 @@ function Home({ onSelect }) {
         icon={<span style={{ fontSize: 22 }}>⚡</span>}
         title="Zihin Sporları"
         subtitle="Hızlı testler, her biri 30 saniyeden az"
-        count="5 oyun"
+        count="10 oyun"
         accent={GAME_THEMES.innerclock.accent}
         onClick={() => onSelect("cat-mindsports")}
       />
@@ -228,7 +229,7 @@ function Home({ onSelect }) {
         icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
         title="Bulmacalar"
         subtitle="Uzun soluklu klasikler"
-        count="5 oyun"
+        count="6 oyun"
         accent={GAME_THEMES.sudoku.accent}
         onClick={() => onSelect("cat-puzzles")}
       />
@@ -300,13 +301,14 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
   );
 }
 
-function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, tetrisHistory, skyscraperHistory }) {
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, tetrisHistory, skyscraperHistory, blockBlastHistory }) {
   const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
   const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
   const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
   const tetrisBest = tetrisHistory.length ? Math.max(...tetrisHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const skyBest = skyscraperHistory.length ? formatClock(Math.min(...skyscraperHistory.map((h) => h.timeMs))) : null;
+  const blockBlastBest = blockBlastHistory.length ? Math.max(...blockBlastHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -325,6 +327,8 @@ function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, min
         onClick={() => selectGame("tetris")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.skyscrapers.accent, fontSize: 18 }}>🏙</span>} title="Kule Bulmaca" subtitle="Kenar ipuçlarıyla ızgarayı doldur" stat={skyBest} accent={GAME_THEMES.skyscrapers.accent}
         onClick={() => selectGame("skyscrapers")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.blockblast.accent, fontSize: 18 }}>▦</span>} title="Blok Patlatma" subtitle="Satır ve sütunları doldurup patlat" stat={blockBlastBest} accent={GAME_THEMES.blockblast.accent}
+        onClick={() => selectGame("blockblast")} />
     </CategoryList>
   );
 }
@@ -3141,6 +3145,329 @@ function OddOneOutGame({ onBack, onReport, history, setHistory }) {
   );
 }
 
+/* ---------------- BLOK PATLATMA ---------------- */
+
+const BLOCK_GRID_SIZE = 8;
+
+const BLOCK_SHAPES = [
+  [[0,0]],
+  [[0,0],[1,0]],
+  [[0,0],[0,1]],
+  [[0,0],[1,0],[2,0]],
+  [[0,0],[0,1],[0,2]],
+  [[0,0],[1,0],[2,0],[3,0]],
+  [[0,0],[0,1],[0,2],[0,3]],
+  [[0,0],[1,0],[0,1],[1,1]],
+  [[0,0],[1,0],[2,0],[0,1]],
+  [[0,0],[1,0],[2,0],[2,1]],
+  [[0,0],[0,1],[1,1],[2,1]],
+  [[0,0],[0,1],[0,2],[1,2]],
+  [[1,0],[1,1],[1,2],[0,2]],
+  [[0,0],[1,0],[1,1],[2,1]],
+  [[1,0],[2,0],[0,1],[1,1]],
+  [[1,0],[0,1],[1,1],[2,1],[1,2]],
+  [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1],[0,2],[1,2],[2,2]],
+];
+
+const BLOCK_COLORS = ["#3B82F6", "#A855F7", "#F97316", "#EF4444", "#22C55E", "#06B6D4", "#EAB308", "#EC4899"];
+
+function blockCubeStyle(color, opts) {
+  const o = opts || {};
+  return {
+    background: `linear-gradient(160deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 35%), ${color}`,
+    boxShadow: o.ghost
+      ? "inset 0 3px 0 rgba(255,255,255,0.35), inset 0 -4px 6px rgba(0,0,0,0.3), 0 6px 16px rgba(0,0,0,0.35)"
+      : "inset 0 2px 0 rgba(255,255,255,0.35), inset 0 -3px 5px rgba(0,0,0,0.3)",
+    borderRadius: 5,
+  };
+}
+
+function shapeDims(shape) {
+  const w = Math.max(...shape.map((p) => p[0])) + 1;
+  const h = Math.max(...shape.map((p) => p[1])) + 1;
+  return { w, h };
+}
+
+function randomBlockPiece() {
+  const shape = BLOCK_SHAPES[Math.floor(Math.random() * BLOCK_SHAPES.length)];
+  const color = BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)];
+  return { shape, color, id: Math.random().toString(36).slice(2) };
+}
+
+function generateBlockPieceSet() {
+  return [randomBlockPiece(), randomBlockPiece(), randomBlockPiece()];
+}
+
+function canPlaceBlockPiece(board, shape, anchorR, anchorC) {
+  for (const [dx, dy] of shape) {
+    const r = anchorR + dy, c = anchorC + dx;
+    if (r < 0 || r >= BLOCK_GRID_SIZE || c < 0 || c >= BLOCK_GRID_SIZE) return false;
+    if (board[r][c]) return false;
+  }
+  return true;
+}
+
+function canPlaceBlockAnywhere(board, shape) {
+  for (let r = 0; r < BLOCK_GRID_SIZE; r++) for (let c = 0; c < BLOCK_GRID_SIZE; c++) {
+    if (canPlaceBlockPiece(board, shape, r, c)) return true;
+  }
+  return false;
+}
+
+function clearBlockLines(board) {
+  const fullRows = [];
+  const fullCols = [];
+  for (let r = 0; r < BLOCK_GRID_SIZE; r++) if (board[r].every((c) => c)) fullRows.push(r);
+  for (let c = 0; c < BLOCK_GRID_SIZE; c++) {
+    let full = true;
+    for (let r = 0; r < BLOCK_GRID_SIZE; r++) if (!board[r][c]) { full = false; break; }
+    if (full) fullCols.push(c);
+  }
+  const next = board.map((row) => row.slice());
+  for (const r of fullRows) for (let c = 0; c < BLOCK_GRID_SIZE; c++) next[r][c] = null;
+  for (const c of fullCols) for (let r = 0; r < BLOCK_GRID_SIZE; r++) next[r][c] = null;
+  return { board: next, linesCleared: fullRows.length + fullCols.length };
+}
+
+function blockBlastMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Parçaları ızgaraya yerleştir, satır ya da sütunu tamamen doldurunca patlar.";
+  const best = Math.max(...history.map((h) => h.score));
+  const avg = history.reduce((s, h) => s + h.score, 0) / history.length;
+  if (best >= 300) return `En iyi skorun ${best.toLocaleString("tr-TR")} — ızgarayı verimli kullanmayı gerçekten öğrenmişsin. Ortalama skorun ${Math.round(avg).toLocaleString("tr-TR")}.`;
+  if (best >= 120) return `En iyi skorun ${best.toLocaleString("tr-TR")}. İyi gidiyor — büyük parçaları erken yerleştirip küçük boşlukları sona saklamak genelde işe yarıyor.`;
+  return `En iyi skorun ${best.toLocaleString("tr-TR")}. İpucu: ızgarayı çok erken doldurmak yerine, satır/sütunları aynı anda bitirecek şekilde boşluk bırakmaya çalış.`;
+}
+
+function BlockBlastGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [board, setBoard] = useState(null);
+  const [pieces, setPieces] = useState([null, null, null]);
+  const [score, setScore] = useState(0);
+  const [finalScore, setFinalScore] = useState(null);
+  const [drag, setDrag] = useState(null); // { pieceIndex, x, y, cellSize, anchorR, anchorC, valid }
+  const boardRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.blockblast.accent;
+  const ACCENT_SOFT = GAME_THEMES.blockblast.soft;
+  const LIFT_PX = 165;
+
+  function startGame() {
+    setBoard(Array.from({ length: BLOCK_GRID_SIZE }, () => Array(BLOCK_GRID_SIZE).fill(null)));
+    setPieces(generateBlockPieceSet());
+    setScore(0);
+    setFinalScore(null);
+    setDrag(null);
+    setPhase("playing");
+  }
+
+  function checkGameOver(currentBoard, currentPieces) {
+    const active = currentPieces.filter((p) => p);
+    if (active.length === 0) return false;
+    return active.every((p) => !canPlaceBlockAnywhere(currentBoard, p.shape));
+  }
+
+  function endGame(finalScoreVal) {
+    const entry = { score: finalScoreVal, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    setFinalScore(finalScoreVal);
+    trackEvent("game_round_complete", { game: "blockblast", score: finalScoreVal });
+    setPhase("result");
+  }
+
+  function commitPlacement(pieceIndex, r, c) {
+    const piece = pieces[pieceIndex];
+    if (!piece || !board || !canPlaceBlockPiece(board, piece.shape, r, c)) return;
+
+    let next = board.map((row) => row.slice());
+    for (const [dx, dy] of piece.shape) next[r + dy][c + dx] = piece.color;
+
+    const { board: cleared, linesCleared } = clearBlockLines(next);
+    const gained = piece.shape.length + linesCleared * 10;
+    const newScore = score + gained;
+
+    const nextPieces = pieces.slice();
+    nextPieces[pieceIndex] = null;
+    const allUsed = nextPieces.every((p) => !p);
+    const finalPieces = allUsed ? generateBlockPieceSet() : nextPieces;
+
+    setBoard(cleared);
+    setScore(newScore);
+    setPieces(finalPieces);
+
+    if (checkGameOver(cleared, finalPieces)) {
+      endGame(newScore);
+    }
+  }
+
+  function updateDrag(pieceIndex, clientX, clientY) {
+    if (!boardRef.current || !board) return;
+    const piece = pieces[pieceIndex];
+    if (!piece) return;
+    const rect = boardRef.current.getBoundingClientRect();
+    const cellSize = rect.width / BLOCK_GRID_SIZE;
+    const hotX = clientX;
+    const hotY = clientY - LIFT_PX;
+    const anchorC = Math.floor((hotX - rect.left) / cellSize);
+    const anchorR = Math.floor((hotY - rect.top) / cellSize);
+    const valid = canPlaceBlockPiece(board, piece.shape, anchorR, anchorC);
+    setDrag({ pieceIndex, x: hotX, y: hotY, cellSize, anchorR, anchorC, valid });
+  }
+
+  function handlePointerDown(e, i) {
+    if (phase !== "playing" || !pieces[i]) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    updateDrag(i, e.clientX, e.clientY);
+  }
+  function handlePointerMove(e, i) {
+    if (!drag || drag.pieceIndex !== i) return;
+    e.preventDefault();
+    updateDrag(i, e.clientX, e.clientY);
+  }
+  function handlePointerUp(e, i) {
+    if (!drag || drag.pieceIndex !== i) return;
+    e.preventDefault();
+    const { anchorR, anchorC, valid } = drag;
+    setDrag(null);
+    if (valid) commitPlacement(i, anchorR, anchorC);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestScoreEver = history.length ? Math.max(...history.map((h) => h.score)) : null;
+
+  const highlightCells = new Set();
+  if (drag) {
+    const piece = pieces[drag.pieceIndex];
+    if (piece) {
+      for (const [dx, dy] of piece.shape) {
+        const r = drag.anchorR + dy, c = drag.anchorC + dx;
+        if (r >= 0 && r < BLOCK_GRID_SIZE && c >= 0 && c < BLOCK_GRID_SIZE) highlightCells.add(`${r}-${c}`);
+      }
+    }
+  }
+
+  return (
+    <Shell>
+      <TopBar title="Blok Patlatma" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Aşağıdaki 3 parçadan birine parmağını bas ve ızgaranın üzerine sürükle — parçanın büyük bir önizlemesi parmağının üstünde belirir, bırakacağın yer ızgarada renkli gösterilir. Parmağını kaldırdığında oraya yerleşir. Bir satırı ya da sütunu tamamen doldurunca o sıra patlar. Hiçbir parça sığmadığında oyun biter.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestScoreEver !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi skor: {bestScoreEver.toLocaleString("tr-TR")}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && board && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 14 }}>
+            Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 700 }}>{score.toLocaleString("tr-TR")}</span>
+          </div>
+
+          <div ref={boardRef} style={{
+            display: "grid", gridTemplateColumns: `repeat(${BLOCK_GRID_SIZE}, 1fr)`,
+            width: "100%", maxWidth: "min(440px, 94vw)", aspectRatio: "1",
+            border: `2px solid ${PALETTE.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24,
+            background: "rgba(255,255,255,0.02)", touchAction: "none", padding: 3, boxSizing: "border-box",
+            gap: 2,
+          }}>
+            {board.flat().map((cell, i) => {
+              const r = Math.floor(i / BLOCK_GRID_SIZE), c = i % BLOCK_GRID_SIZE;
+              const key = `${r}-${c}`;
+              const isHighlighted = highlightCells.has(key);
+              let cellStyle = { background: "rgba(255,255,255,0.04)", borderRadius: 4 };
+              if (cell) cellStyle = blockCubeStyle(cell);
+              else if (isHighlighted) {
+                cellStyle = drag.valid
+                  ? { background: hexToRgba(ACCENT, 0.4), borderRadius: 4, border: `2px solid ${hexToRgba(ACCENT, 0.7)}` }
+                  : { background: "rgba(201,112,94,0.35)", borderRadius: 4, border: "2px solid rgba(201,112,94,0.7)" };
+              }
+              return <div key={i} style={cellStyle} />;
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: 16, width: "100%", maxWidth: "min(440px, 94vw)", justifyContent: "center", marginBottom: 10 }}>
+            {pieces.map((piece, i) => {
+              if (!piece) return <div key={i} style={{ flex: 1, minHeight: 84 }} />;
+              const { w, h } = shapeDims(piece.shape);
+              const cellPx = 20;
+              const isDragging = drag && drag.pieceIndex === i;
+              return (
+                <div key={piece.id}
+                  onPointerDown={(e) => handlePointerDown(e, i)}
+                  onPointerMove={(e) => handlePointerMove(e, i)}
+                  onPointerUp={(e) => handlePointerUp(e, i)}
+                  onPointerCancel={(e) => handlePointerUp(e, i)}
+                  style={{
+                    flex: 1, minHeight: 84, borderRadius: 14,
+                    border: `1px solid ${PALETTE.border}`,
+                    background: "rgba(255,255,255,0.02)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "grab", touchAction: "none", opacity: isDragging ? 0.2 : 1,
+                    userSelect: "none",
+                  }}>
+                  <div style={{ position: "relative", width: w * cellPx, height: h * cellPx }}>
+                    {piece.shape.map(([dx, dy], si) => (
+                      <div key={si} style={{
+                        position: "absolute", left: dx * cellPx, top: dy * cellPx,
+                        width: cellPx - 3, height: cellPx - 3,
+                        ...blockCubeStyle(piece.color),
+                      }} />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ color: PALETTE.faint, fontSize: 11, textAlign: "center" }}>
+            Bir parçayı sürükleyip ızgaraya bırak
+          </p>
+
+          {drag && pieces[drag.pieceIndex] && (() => {
+            const piece = pieces[drag.pieceIndex];
+            const cs = drag.cellSize * 1.15;
+            return (
+              <div style={{
+                position: "fixed", left: drag.x, top: drag.y, zIndex: 999,
+                pointerEvents: "none",
+              }}>
+                {piece.shape.map(([dx, dy], si) => (
+                  <div key={si} style={{
+                    position: "absolute", left: dx * cs, top: dy * cs,
+                    width: cs - 3, height: cs - 3,
+                    ...blockCubeStyle(drag.valid ? piece.color : "#C9705E", { ghost: true }),
+                    opacity: 0.95,
+                  }} />
+                ))}
+              </div>
+            );
+          })()}
+        </>
+      )}
+
+      {phase === "result" && finalScore !== null && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{finalScore.toLocaleString("tr-TR")}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.bad, marginBottom: 24 }}>Hiçbir parça sığmadı</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
 /* ---------------- RAPOR ---------------- */
 
 function innerclockMessage(history) {
@@ -3221,6 +3548,7 @@ function Report({ type, history, onBack }) {
     quicksort: "Hızlı Sıralama Raporu",
     linecompare: "Çizgi Kıyası Raporu",
     oddoneout: "Tek Farklı Raporu",
+    blockblast: "Blok Patlatma Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -3239,6 +3567,7 @@ function Report({ type, history, onBack }) {
     quicksort: quicksortMessage,
     linecompare: lineCompareMessage,
     oddoneout: oddOneOutMessage,
+    blockblast: blockBlastMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -3285,6 +3614,9 @@ function Report({ type, history, onBack }) {
     } else if (type === "oddoneout") {
       best = formatMs(Math.min(...history.map((h) => h.ms))) + "ms";
       avg = formatMs(Math.round(history.reduce((s, h) => s + h.ms, 0) / count)) + "ms";
+    } else if (type === "blockblast") {
+      best = Math.max(...history.map((h) => h.score)).toLocaleString("tr-TR");
+      avg = Math.round(history.reduce((s, h) => s + h.score, 0) / count).toLocaleString("tr-TR");
     }
   }
 
@@ -3399,6 +3731,9 @@ function Report({ type, history, onBack }) {
                 {type === "oddoneout" && (
                   <span className="mono">{formatMs(h.ms)}ms</span>
                 )}
+                {type === "blockblast" && (
+                  <span className="mono">{h.score.toLocaleString("tr-TR")}</span>
+                )}
               </div>
             ))}
           </div>
@@ -3428,6 +3763,7 @@ function App() {
   const [quicksortHistory, setQuicksortHistory] = useState([]);
   const [linecompareHistory, setLinecompareHistory] = useState([]);
   const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
+  const [blockBlastHistory, setBlockBlastHistory] = useState([]);
 
   return (
     <>
@@ -3452,6 +3788,7 @@ function App() {
           minesweeperHistory={minesweeperHistory}
           tetrisHistory={tetrisHistory}
           skyscraperHistory={skyscraperHistory}
+          blockBlastHistory={blockBlastHistory}
         />
       )}
       {view === "innerclock" && (
@@ -3560,6 +3897,13 @@ function App() {
           history={oddoneoutHistory} setHistory={setOddoneoutHistory}
         />
       )}
+      {view === "blockblast" && (
+        <BlockBlastGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-blockblast")}
+          history={blockBlastHistory} setHistory={setBlockBlastHistory}
+        />
+      )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
       {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
       {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
@@ -3576,6 +3920,7 @@ function App() {
       {view === "report-quicksort" && <Report type="quicksort" history={quicksortHistory} onBack={() => setView("quicksort")} />}
       {view === "report-linecompare" && <Report type="linecompare" history={linecompareHistory} onBack={() => setView("linecompare")} />}
       {view === "report-oddoneout" && <Report type="oddoneout" history={oddoneoutHistory} onBack={() => setView("oddoneout")} />}
+      {view === "report-blockblast" && <Report type="blockblast" history={blockBlastHistory} onBack={() => setView("blockblast")} />}
     </>
   );
 }
