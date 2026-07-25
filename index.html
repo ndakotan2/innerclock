@@ -239,7 +239,6 @@ function playTestBeep(setBeepStatus) {
 }
 
 function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
-  const [beepStatus, setBeepStatus] = useState(null);
   return (
     <Shell>
       <div style={{ textAlign: "center", marginBottom: 32, position: "relative", width: "100%" }}>
@@ -252,16 +251,6 @@ function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
         </button>
         <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Innerclock</div>
         <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Ne oynamak istersin?</h1>
-        <button type="button" onClick={() => playTestBeep(setBeepStatus)}
-          style={{
-            marginTop: 14, padding: "8px 16px", borderRadius: 999, border: `1px solid ${PALETTE.border}`,
-            background: "rgba(255,255,255,0.03)", color: PALETTE.dim, fontSize: 12, cursor: "pointer",
-          }}>
-          🔔 Test Sesi Çal
-        </button>
-        {beepStatus && (
-          <p style={{ color: PALETTE.faint, fontSize: 11, marginTop: 8 }}>{beepStatus}</p>
-        )}
       </div>
 
       <CategoryCard
@@ -276,9 +265,17 @@ function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
         icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
         title="Bulmacalar"
         subtitle="Uzun soluklu klasikler"
-        count="6 oyun"
+        count="4 oyun"
         accent={GAME_THEMES.sudoku.accent}
         onClick={() => onSelect("cat-puzzles")}
+      />
+      <CategoryCard
+        icon={<span style={{ fontSize: 20, color: GAME_THEMES.tetris.accent }}>▤</span>}
+        title="Blok Oyunları"
+        subtitle="Parçaları yerleştir, sıraları temizle"
+        count="2 oyun"
+        accent={GAME_THEMES.tetris.accent}
+        onClick={() => onSelect("cat-blockgames")}
       />
 
       <button type="button" onClick={() => onSelect("feedback")}
@@ -348,14 +345,12 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
   );
 }
 
-function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, tetrisHistory, skyscraperHistory, blockBlastHistory }) {
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, skyscraperHistory }) {
   const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
   const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
   const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
-  const tetrisBest = tetrisHistory.length ? Math.max(...tetrisHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const skyBest = skyscraperHistory.length ? formatClock(Math.min(...skyscraperHistory.map((h) => h.timeMs))) : null;
-  const blockBlastBest = blockBlastHistory.length ? Math.max(...blockBlastHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -370,10 +365,25 @@ function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, min
         onClick={() => selectGame("2048")} />
       <GameCard icon={<span style={{ fontSize: 18 }}>💣</span>} title="Mayın Tarlası" subtitle="Sayılara güvenerek ilerle" stat={msBest} accent={GAME_THEMES.minesweeper.accent}
         onClick={() => selectGame("minesweeper")} />
-      <GameCard icon={<span style={{ color: GAME_THEMES.tetris.accent, fontSize: 18 }}>▤</span>} title="Tetris" subtitle="Parçaları düşür, sıraları temizle" stat={tetrisBest} accent={GAME_THEMES.tetris.accent}
-        onClick={() => selectGame("tetris")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.skyscrapers.accent, fontSize: 18 }}>🏙</span>} title="Kule Bulmaca" subtitle="Kenar ipuçlarıyla ızgarayı doldur" stat={skyBest} accent={GAME_THEMES.skyscrapers.accent}
         onClick={() => selectGame("skyscrapers")} />
+    </CategoryList>
+  );
+}
+
+function BlockGamesList({ onBack, onSelectGame, tetrisHistory, blockBlastHistory }) {
+  const tetrisBest = tetrisHistory.length ? Math.max(...tetrisHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
+  const blockBlastBest = blockBlastHistory.length ? Math.max(...blockBlastHistory.map((h) => h.score)).toLocaleString("tr-TR") : null;
+
+  function selectGame(game) {
+    trackEvent("game_open", { game });
+    onSelectGame(game);
+  }
+
+  return (
+    <CategoryList title="Blok Oyunları" onBack={onBack}>
+      <GameCard icon={<span style={{ color: GAME_THEMES.tetris.accent, fontSize: 18 }}>▤</span>} title="Tetris" subtitle="Parçaları düşür, sıraları temizle" stat={tetrisBest} accent={GAME_THEMES.tetris.accent}
+        onClick={() => selectGame("tetris")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.blockblast.accent, fontSize: 18 }}>▦</span>} title="Blok Patlatma" subtitle="Satır ve sütunları doldurup patlat" stat={blockBlastBest} accent={GAME_THEMES.blockblast.accent}
         onClick={() => selectGame("blockblast")} />
     </CategoryList>
@@ -4083,8 +4093,14 @@ function App() {
           sudokuHistory={sudokuHistory}
           game2048History={game2048History}
           minesweeperHistory={minesweeperHistory}
-          tetrisHistory={tetrisHistory}
           skyscraperHistory={skyscraperHistory}
+        />
+      )}
+      {view === "cat-blockgames" && (
+        <BlockGamesList
+          onBack={() => setView("home")}
+          onSelectGame={setView}
+          tetrisHistory={tetrisHistory}
           blockBlastHistory={blockBlastHistory}
         />
       )}
@@ -4147,7 +4163,7 @@ function App() {
       )}
       {view === "tetris" && (
         <TetrisGame
-          onBack={() => setView("cat-puzzles")}
+          onBack={() => setView("cat-blockgames")}
           onReport={() => setView("report-tetris")}
           history={tetrisHistory} setHistory={setTetrisHistory}
         />
@@ -4196,7 +4212,7 @@ function App() {
       )}
       {view === "blockblast" && (
         <BlockBlastGame
-          onBack={() => setView("cat-puzzles")}
+          onBack={() => setView("cat-blockgames")}
           onReport={() => setView("report-blockblast")}
           history={blockBlastHistory} setHistory={setBlockBlastHistory}
         />
