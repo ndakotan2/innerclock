@@ -209,12 +209,51 @@ function CategoryCard({ icon, title, subtitle, count, accent, onClick }) {
   );
 }
 
-function Home({ onSelect }) {
+function playTestBeep(setBeepStatus) {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new Ctx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = 440;
+    osc.type = "square";
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.5, ctx.currentTime + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.6);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.65);
+    if (setBeepStatus) setBeepStatus(`Çaldı — durum: ${ctx.state}`);
+  } catch (e) {
+    if (setBeepStatus) setBeepStatus(`Hata: ${e.message}`);
+  }
+}
+
+function Home({ onSelect, musicOn, setMusicOn }) {
+  const [beepStatus, setBeepStatus] = useState(null);
   return (
     <Shell>
-      <div style={{ textAlign: "center", marginBottom: 32 }}>
+      <div style={{ textAlign: "center", marginBottom: 32, position: "relative", width: "100%" }}>
+        <button type="button" onClick={() => setMusicOn((m) => !m)}
+          style={{
+            position: "absolute", top: -8, right: 0, background: "none", border: "none",
+            color: musicOn ? PALETTE.amber : PALETTE.faint, fontSize: 18, cursor: "pointer", padding: 6,
+          }}>
+          {musicOn ? "🎵" : "🔇"}
+        </button>
         <div style={{ fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase", color: PALETTE.dim, marginBottom: 8 }}>Innerclock</div>
         <h1 style={{ fontWeight: 600, fontSize: 22, color: PALETTE.bright, margin: 0 }}>Ne oynamak istersin?</h1>
+        <button type="button" onClick={() => playTestBeep(setBeepStatus)}
+          style={{
+            marginTop: 14, padding: "8px 16px", borderRadius: 999, border: `1px solid ${PALETTE.border}`,
+            background: "rgba(255,255,255,0.03)", color: PALETTE.dim, fontSize: 12, cursor: "pointer",
+          }}>
+          🔔 Test Sesi Çal
+        </button>
+        {beepStatus && (
+          <p style={{ color: PALETTE.faint, fontSize: 11, marginTop: 8 }}>{beepStatus}</p>
+        )}
       </div>
 
       <CategoryCard
@@ -3229,6 +3268,49 @@ function clearBlockLines(board) {
   return { board: next, linesCleared: fullRows.length + fullCols.length };
 }
 
+const LINE_CLEAR_PHRASES = {
+  1: ["Güzel", "İyi gidiyor", "Aferin"],
+  2: ["Harika", "Çifte patlama"],
+  3: ["Muhteşem", "Üçlü kombo"],
+  4: ["İnanılmaz", "Efsane"],
+};
+
+function pickClearPhrase(linesCleared) {
+  const key = Math.min(linesCleared, 4);
+  const arr = LINE_CLEAR_PHRASES[key];
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+let cachedTrVoice = null;
+function getTrVoice() {
+  if (!window.speechSynthesis) return null;
+  if (cachedTrVoice) return cachedTrVoice;
+  const voices = window.speechSynthesis.getVoices();
+  const v = voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("tr"));
+  if (v) cachedTrVoice = v;
+  return v;
+}
+if (typeof window !== "undefined" && window.speechSynthesis) {
+  window.speechSynthesis.onvoiceschanged = () => { cachedTrVoice = null; getTrVoice(); };
+}
+
+function speakTurkish(text) {
+  try {
+    if (!window.speechSynthesis) return;
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "tr-TR";
+    utter.rate = 1.05;
+    utter.pitch = 1.1;
+    utter.volume = 1;
+    const v = getTrVoice();
+    if (v) utter.voice = v;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+  } catch (e) {
+    // ses sentezi desteklenmiyorsa sessizce geç
+  }
+}
+
 function blockBlastMessage(history) {
   if (history.length === 0) return "Henüz hiç oynamadın. Parçaları ızgaraya yerleştir, satır ya da sütunu tamamen doldurunca patlar.";
   const best = Math.max(...history.map((h) => h.score));
@@ -3245,6 +3327,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
   const [score, setScore] = useState(0);
   const [finalScore, setFinalScore] = useState(null);
   const [drag, setDrag] = useState(null); // { pieceIndex, x, y, cellSize, anchorR, anchorC, valid }
+  const [soundOn, setSoundOn] = useState(true);
   const boardRef = useRef(null);
 
   const ACCENT = GAME_THEMES.blockblast.accent;
@@ -3258,6 +3341,13 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setFinalScore(null);
     setDrag(null);
     setPhase("playing");
+    if (soundOn && window.speechSynthesis) {
+      try {
+        const warmup = new SpeechSynthesisUtterance(" ");
+        warmup.volume = 0.01;
+        window.speechSynthesis.speak(warmup);
+      } catch (e) {}
+    }
   }
 
   function checkGameOver(currentBoard, currentPieces) {
@@ -3271,6 +3361,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setHistory((prev) => [entry, ...prev].slice(0, 30));
     setFinalScore(finalScoreVal);
     trackEvent("game_round_complete", { game: "blockblast", score: finalScoreVal });
+    if (soundOn) speakTurkish("Oyun bitti");
     setPhase("result");
   }
 
@@ -3284,6 +3375,10 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     const { board: cleared, linesCleared } = clearBlockLines(next);
     const gained = piece.shape.length + linesCleared * 10;
     const newScore = score + gained;
+
+    if (linesCleared > 0 && soundOn) {
+      speakTurkish(pickClearPhrase(linesCleared));
+    }
 
     const nextPieces = pieces.slice();
     nextPieces[pieceIndex] = null;
@@ -3305,12 +3400,14 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     if (!piece) return;
     const rect = boardRef.current.getBoundingClientRect();
     const cellSize = rect.width / BLOCK_GRID_SIZE;
+    const { w, h } = shapeDims(piece.shape);
     const hotX = clientX;
     const hotY = clientY - LIFT_PX;
-    const anchorC = Math.floor((hotX - rect.left) / cellSize);
-    const anchorR = Math.floor((hotY - rect.top) / cellSize);
+    // Parçanın ortası parmağın altına gelsin, sol üst köşesi değil
+    const anchorC = Math.round((hotX - rect.left) / cellSize - w / 2);
+    const anchorR = Math.round((hotY - rect.top) / cellSize - h / 2);
     const valid = canPlaceBlockPiece(board, piece.shape, anchorR, anchorC);
-    setDrag({ pieceIndex, x: hotX, y: hotY, cellSize, anchorR, anchorC, valid });
+    setDrag({ pieceIndex, x: hotX, y: hotY, cellSize, anchorR, anchorC, valid, w, h });
   }
 
   function handlePointerDown(e, i) {
@@ -3369,8 +3466,14 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
 
       {phase === "playing" && board && (
         <>
-          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 14 }}>
-            Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 700 }}>{score.toLocaleString("tr-TR")}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 12, color: PALETTE.dim }}>
+              Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 700 }}>{score.toLocaleString("tr-TR")}</span>
+            </div>
+            <button type="button" onClick={() => setSoundOn((s) => !s)}
+              style={{ background: "none", border: "none", color: soundOn ? ACCENT : PALETTE.faint, fontSize: 16, cursor: "pointer", padding: 4 }}>
+              {soundOn ? "🔊" : "🔇"}
+            </button>
           </div>
 
           <div ref={boardRef} style={{
@@ -3434,7 +3537,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
 
           {drag && pieces[drag.pieceIndex] && (() => {
             const piece = pieces[drag.pieceIndex];
-            const cs = drag.cellSize * 1.15;
+            const cs = drag.cellSize;
             return (
               <div style={{
                 position: "fixed", left: drag.x, top: drag.y, zIndex: 999,
@@ -3442,7 +3545,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
               }}>
                 {piece.shape.map(([dx, dy], si) => (
                   <div key={si} style={{
-                    position: "absolute", left: dx * cs, top: dy * cs,
+                    position: "absolute", left: (dx - drag.w / 2) * cs, top: (dy - drag.h / 2) * cs,
                     width: cs - 3, height: cs - 3,
                     ...blockCubeStyle(drag.valid ? piece.color : "#C9705E", { ghost: true }),
                     opacity: 0.95,
@@ -3745,6 +3848,80 @@ function Report({ type, history, onBack }) {
 
 /* ---------------- APP ---------------- */
 
+/* ---------------- AMBİYANS MÜZİĞİ ---------------- */
+
+const AMBIENT_CHORDS = [
+  [220.00, 261.63, 329.63, 392.00], // Am9
+  [174.61, 220.00, 261.63, 329.63], // Fmaj7
+  [261.63, 329.63, 392.00, 493.88], // Cmaj9
+  [293.66, 349.23, 440.00, 523.25], // Dm9
+];
+
+function createAmbientPad(ctx, destinationNode) {
+  const baseChord = AMBIENT_CHORDS[0];
+  const oscs = [];
+
+  baseChord.forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = i % 2 === 0 ? "sine" : "triangle";
+    osc.frequency.value = freq;
+
+    const oscGain = ctx.createGain();
+    oscGain.gain.value = 0.2;
+
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.05 + Math.random() * 0.08;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 0.06;
+    lfo.connect(lfoGain);
+    lfoGain.connect(oscGain.gain);
+
+    osc.connect(oscGain);
+    oscGain.connect(destinationNode);
+    osc.start();
+    lfo.start();
+    oscs.push(osc);
+  });
+
+  // Yavaşça değişen akor dizisi — her akor arasında yumuşak, 5 saniyelik geçiş
+  let chordIndex = 0;
+  const chordInterval = setInterval(() => {
+    chordIndex = (chordIndex + 1) % AMBIENT_CHORDS.length;
+    const nextChord = AMBIENT_CHORDS[chordIndex];
+    oscs.forEach((osc, i) => {
+      osc.frequency.linearRampToValueAtTime(nextChord[i], ctx.currentTime + 5);
+    });
+  }, 26000);
+
+  // Ara sıra gelen yumuşak "çıngırak" tonları — mevcut akordan rastgele bir nota, bir oktav yukarı
+  function scheduleSparkle() {
+    const delay = 6000 + Math.random() * 9000;
+    setTimeout(() => {
+      try {
+        const chord = AMBIENT_CHORDS[chordIndex];
+        const note = chord[Math.floor(Math.random() * chord.length)] * 2;
+        const sOsc = ctx.createOscillator();
+        sOsc.type = "sine";
+        sOsc.frequency.value = note;
+        const sGain = ctx.createGain();
+        sGain.gain.setValueAtTime(0, ctx.currentTime);
+        sGain.gain.linearRampToValueAtTime(0.055, ctx.currentTime + 0.03);
+        sGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 2.8);
+        sOsc.connect(sGain);
+        sGain.connect(destinationNode);
+        sOsc.start();
+        sOsc.stop(ctx.currentTime + 3);
+      } catch (e) {
+        // sparkle çalınamadıysa sessizce geç
+      }
+      scheduleSparkle();
+    }, delay);
+  }
+  scheduleSparkle();
+
+  return oscs;
+}
+
 function App() {
   const [view, setView] = useState("home");
   const [icHistory, setIcHistory] = useState([]);
@@ -3764,10 +3941,69 @@ function App() {
   const [linecompareHistory, setLinecompareHistory] = useState([]);
   const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
   const [blockBlastHistory, setBlockBlastHistory] = useState([]);
+  const [musicOn, setMusicOn] = useState(true);
+  const audioCtxRef = useRef(null);
+  const masterGainRef = useRef(null);
+  const musicOnRef = useRef(true);
+
+  useEffect(() => { musicOnRef.current = musicOn; }, [musicOn]);
+
+  useEffect(() => {
+    function unlockAudio() {
+      if (audioCtxRef.current) return;
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        const ctx = new Ctx();
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 900;
+        const masterGain = ctx.createGain();
+        masterGain.gain.setValueAtTime(0, ctx.currentTime);
+        filter.connect(masterGain);
+        masterGain.connect(ctx.destination);
+        createAmbientPad(ctx, filter);
+        audioCtxRef.current = ctx;
+        masterGainRef.current = masterGain;
+
+        const beginFade = () => {
+          if (musicOnRef.current) {
+            masterGain.gain.linearRampToValueAtTime(0.18, ctx.currentTime + 3);
+          }
+        };
+        // resume()'un tamamlanmasını beklemeden hemen başlat — bazı tarayıcılarda
+        // bu promise hiç çözülmüyor ve müzik sonsuza kadar sessiz kalıyordu
+        beginFade();
+        if (ctx.state === "suspended" && ctx.resume) {
+          ctx.resume().catch(() => {});
+        }
+
+        document.removeEventListener("pointerdown", unlockAudio);
+        document.removeEventListener("touchend", unlockAudio);
+        document.removeEventListener("click", unlockAudio);
+      } catch (e) {
+        // Web Audio desteklenmiyorsa sessizce geç
+      }
+    }
+    document.addEventListener("pointerdown", unlockAudio);
+    document.addEventListener("touchend", unlockAudio);
+    document.addEventListener("click", unlockAudio);
+    return () => {
+      document.removeEventListener("pointerdown", unlockAudio);
+      document.removeEventListener("touchend", unlockAudio);
+      document.removeEventListener("click", unlockAudio);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (masterGainRef.current && audioCtxRef.current) {
+      const target = musicOn ? 0.18 : 0;
+      masterGainRef.current.gain.linearRampToValueAtTime(target, audioCtxRef.current.currentTime + 1.2);
+    }
+  }, [musicOn]);
 
   return (
     <>
-      {view === "home" && <Home onSelect={setView} />}
+      {view === "home" && <Home onSelect={setView} musicOn={musicOn} setMusicOn={setMusicOn} />}
       {view === "cat-mindsports" && (
         <MindSportsList
           onBack={() => setView("home")}
