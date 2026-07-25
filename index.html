@@ -107,10 +107,16 @@ function TopBar({ title, onBack, onReport, accent }) {
 }
 
 const AD_SECONDS = 5;
+// Reklamları geçici olarak kapatmak için false yap, geri açmak için true yap.
+const ADS_ENABLED = false;
 
 function AdScreen({ onDone }) {
   const [secondsLeft, setSecondsLeft] = useState(AD_SECONDS);
   useEffect(() => {
+    if (!ADS_ENABLED) {
+      onDone();
+      return;
+    }
     const interval = setInterval(() => {
       setSecondsLeft((prev) => {
         if (prev <= 1) { clearInterval(interval); return 0; }
@@ -119,6 +125,8 @@ function AdScreen({ onDone }) {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  if (!ADS_ENABLED) return null;
 
   return (
     <div style={{ width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`, background: "linear-gradient(160deg, #1A1F2E, #0F1219)", padding: "28px 20px", marginBottom: 36, textAlign: "center" }}>
