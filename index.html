@@ -72,6 +72,9 @@ const GAME_THEMES = {
   linecompare:{ accent: "#5BD9A8", soft: "rgba(91,217,168,0.12)" },
   oddoneout:  { accent: "#B85BC9", soft: "rgba(184,91,201,0.12)" },
   blockblast: { accent: "#E0955B", soft: "rgba(224,149,91,0.12)" },
+  carpim:     { accent: "#D95B7A", soft: "rgba(217,91,122,0.12)" },
+  mantik:     { accent: "#7C9CBF", soft: "rgba(124,156,191,0.12)" },
+  kakuro:     { accent: "#D9B25B", soft: "rgba(217,178,91,0.12)" },
 };
 
 function Shell({ children }) {
@@ -257,7 +260,7 @@ function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
         icon={<span style={{ fontSize: 22 }}>⚡</span>}
         title="Zihin Sporları"
         subtitle="Hızlı testler, her biri 30 saniyeden az"
-        count="10 oyun"
+        count="12 oyun"
         accent={GAME_THEMES.innerclock.accent}
         onClick={() => onSelect("cat-mindsports")}
       />
@@ -265,7 +268,7 @@ function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
         icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
         title="Bulmacalar"
         subtitle="Uzun soluklu klasikler"
-        count="4 oyun"
+        count="5 oyun"
         accent={GAME_THEMES.sudoku.accent}
         onClick={() => onSelect("cat-puzzles")}
       />
@@ -302,7 +305,7 @@ function CategoryList({ title, onBack, onSelectGame, children }) {
   );
 }
 
-function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, nbackHistory, balanceHistory, quicksortHistory, linecompareHistory, oddoneoutHistory }) {
+function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, nbackHistory, balanceHistory, quicksortHistory, linecompareHistory, oddoneoutHistory, carpimHistory, mantikHistory }) {
   const icAvg = icHistory.length ? (icHistory.reduce((s, h) => s + h.pct, 0) / icHistory.length).toFixed(0) + "%" : null;
   const reactionBest = reactionHistory.length ? formatMs(Math.min(...reactionHistory.map((h) => h.ms))) + "ms" : null;
   const memoryBest = memoryHistory.length ? Math.max(...memoryHistory.map((h) => h.score)) + " basamak" : null;
@@ -313,6 +316,8 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
   const quicksortBest = quicksortHistory.length ? formatMs(Math.min(...quicksortHistory.map((h) => h.timeMs))) + "ms" : null;
   const linecompareBest = linecompareHistory.length ? Math.max(...linecompareHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
   const oddoneoutBest = oddoneoutHistory.length ? formatMs(Math.min(...oddoneoutHistory.map((h) => h.ms))) + "ms" : null;
+  const carpimBest = carpimHistory.length ? Math.max(...carpimHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
+  const mantikBest = mantikHistory.length ? Math.max(...mantikHistory.map((h) => h.pct)).toFixed(0) + "%" : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -341,16 +346,21 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
         onClick={() => selectGame("linecompare")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.oddoneout.accent, fontSize: 16 }}>◉</span>} title="Tek Farklı" subtitle="Aralarındaki farklı olanı bul" stat={oddoneoutBest} accent={GAME_THEMES.oddoneout.accent}
         onClick={() => selectGame("oddoneout")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.carpim.accent, fontSize: 18, fontWeight: 800 }}>✕</span>} title="Çarpım Ustası" subtitle="Hızlı ve eğlenceli çarpım tablosu" stat={carpimBest} accent={GAME_THEMES.carpim.accent}
+        onClick={() => selectGame("carpim")} />
+      <GameCard icon={<span style={{ fontSize: 18 }}>🧩</span>} title="Sıralama Bulmacası" subtitle="İpuçlarına göre doğru sırayı bul" stat={mantikBest} accent={GAME_THEMES.mantik.accent}
+        onClick={() => selectGame("mantik")} />
     </CategoryList>
   );
 }
 
-function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, skyscraperHistory }) {
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, skyscraperHistory, kakuroHistory }) {
   const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
   const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
   const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
   const skyBest = skyscraperHistory.length ? formatClock(Math.min(...skyscraperHistory.map((h) => h.timeMs))) : null;
+  const kakuroBest = kakuroHistory.length ? formatClock(Math.min(...kakuroHistory.map((h) => h.timeMs))) : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -367,6 +377,8 @@ function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, min
         onClick={() => selectGame("minesweeper")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.skyscrapers.accent, fontSize: 18 }}>🏙</span>} title="Kule Bulmaca" subtitle="Kenar ipuçlarıyla ızgarayı doldur" stat={skyBest} accent={GAME_THEMES.skyscrapers.accent}
         onClick={() => selectGame("skyscrapers")} />
+      <GameCard icon={<span style={{ color: GAME_THEMES.kakuro.accent, fontSize: 16, fontWeight: 800 }}>Σ</span>} title="Kakuro" subtitle="Toplamlara göre rakamları yerleştir" stat={kakuroBest} accent={GAME_THEMES.kakuro.accent}
+        onClick={() => selectGame("kakuro")} />
     </CategoryList>
   );
 }
@@ -3404,6 +3416,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
   const [drag, setDrag] = useState(null); // { pieceIndex, x, y, cellSize, anchorR, anchorC, valid }
   const [soundOn, setSoundOn] = useState(true);
   const [clearingCells, setClearingCells] = useState(new Set());
+  const [combo, setCombo] = useState(0);
   const boardRef = useRef(null);
 
   const ACCENT = GAME_THEMES.blockblast.accent;
@@ -3417,6 +3430,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setFinalScore(null);
     setDrag(null);
     setClearingCells(new Set());
+    setCombo(0);
     setPhase("playing");
     if (soundOn && window.speechSynthesis) {
       try {
@@ -3442,8 +3456,13 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
     setPhase("result");
   }
 
-  function finalizePlacement(newBoard, placedCellCount, linesCleared, pieceIndex, currentScore) {
-    const gained = placedCellCount + linesCleared * 10;
+  const LINE_SCORE_TABLE = [0, 100, 300, 600, 1000];
+  function lineClearScore(linesCleared) {
+    if (linesCleared <= 4) return LINE_SCORE_TABLE[linesCleared];
+    return 1000 + (linesCleared - 4) * 400;
+  }
+
+  function finalizePlacement(newBoard, gained, pieceIndex, currentScore) {
     const newScore = currentScore + gained;
     setScore(newScore);
 
@@ -3484,16 +3503,23 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
       setClearingCells(clearing);
       if (soundOn) playLineClearChime(linesCleared);
 
+      const newCombo = combo + 1;
+      setCombo(newCombo);
+      const lineScore = Math.round(lineClearScore(linesCleared) * (1 + (newCombo - 1) * 0.25));
+      const gained = piece.shape.length * 2 + lineScore;
+
       setTimeout(() => {
         const clearedBoard = placed.map((row) => row.slice());
         for (const rr of fullRows) for (let cc = 0; cc < BLOCK_GRID_SIZE; cc++) clearedBoard[rr][cc] = null;
         for (const cc of fullCols) for (let rr = 0; rr < BLOCK_GRID_SIZE; rr++) clearedBoard[rr][cc] = null;
         setBoard(clearedBoard);
         setClearingCells(new Set());
-        finalizePlacement(clearedBoard, piece.shape.length, linesCleared, pieceIndex, score);
+        finalizePlacement(clearedBoard, gained, pieceIndex, score);
       }, 280);
     } else {
-      finalizePlacement(placed, piece.shape.length, 0, pieceIndex, score);
+      setCombo(0);
+      const gained = piece.shape.length * 2;
+      finalizePlacement(placed, gained, pieceIndex, score);
     }
   }
 
@@ -3578,6 +3604,9 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
             <div style={{ fontSize: 12, color: PALETTE.dim }}>
               Skor: <span className="mono" style={{ color: ACCENT, fontWeight: 700 }}>{score.toLocaleString("tr-TR")}</span>
             </div>
+            {combo > 1 && (
+              <div style={{ fontSize: 12, color: PALETTE.amber, fontWeight: 700 }}>🔥 x{combo}</div>
+            )}
             <button type="button" onClick={() => setSoundOn((s) => !s)}
               style={{ background: "none", border: "none", color: soundOn ? ACCENT : PALETTE.faint, fontSize: 16, cursor: "pointer", padding: 4 }}>
               {soundOn ? "🔊" : "🔇"}
@@ -3595,8 +3624,8 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
 
           <div ref={boardRef} style={{
             display: "grid", gridTemplateColumns: `repeat(${BLOCK_GRID_SIZE}, 1fr)`,
-            width: "100%", maxWidth: "min(440px, 94vw)", aspectRatio: "1",
-            border: `2px solid ${PALETTE.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 24,
+            width: "100%", maxWidth: "min(420px, 92vw, 56vh)", aspectRatio: "1",
+            border: `2px solid ${PALETTE.border}`, borderRadius: 12, overflow: "hidden", marginBottom: 16,
             background: "rgba(0,0,0,0.28)", touchAction: "none", padding: 3, boxSizing: "border-box",
             gap: 2,
           }}>
@@ -3616,7 +3645,7 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 16, width: "100%", maxWidth: "min(440px, 94vw)", justifyContent: "center", marginBottom: 10 }}>
+          <div style={{ display: "flex", gap: 16, width: "100%", maxWidth: "min(420px, 92vw, 56vh)", justifyContent: "center", marginBottom: 8 }}>
             {pieces.map((piece, i) => {
               if (!piece) return <div key={i} style={{ flex: 1, minHeight: 84 }} />;
               const { w, h } = shapeDims(piece.shape);
@@ -3679,6 +3708,843 @@ function BlockBlastGame({ onBack, onReport, history, setHistory }) {
         <div style={{ textAlign: "center" }}>
           <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{finalScore.toLocaleString("tr-TR")}</div>
           <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.bad, marginBottom: 24 }}>Hiçbir parça sığmadı</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- ÇARPIM USTASI ---------------- */
+
+const CARPIM_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", min: 1, max: 5 },
+  { id: "orta", label: "Orta", min: 2, max: 10 },
+  { id: "zor", label: "Zor", min: 5, max: 12 },
+];
+const CARPIM_TOTAL_QUESTIONS = 10;
+
+function generateCarpimQuestion(min, max) {
+  const a = min + Math.floor(Math.random() * (max - min + 1));
+  const b = min + Math.floor(Math.random() * (max - min + 1));
+  const correct = a * b;
+  const candidates = new Set([
+    correct + a, correct - a, correct + b, correct - b,
+    a * (b + 1), a * (b - 1), (a + 1) * b, (a - 1) * b,
+    correct + (Math.random() < 0.5 ? 1 : -1) * (2 + Math.floor(Math.random() * 5)),
+  ]);
+  candidates.delete(correct);
+  const pool = shuffleArr(Array.from(candidates).filter((v) => v > 0));
+  const distractors = pool.slice(0, 3);
+  let guard = 1;
+  while (distractors.length < 3) {
+    const fallback = correct + guard * (distractors.length % 2 === 0 ? 1 : -1);
+    guard++;
+    if (fallback > 0 && fallback !== correct && !distractors.includes(fallback)) distractors.push(fallback);
+  }
+  const options = shuffleArr([correct, ...distractors]);
+  return { a, b, correct, options };
+}
+
+function carpimMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Çarpım tablosunu ne kadar hızlı ve doğru bildiğini ilk turunda görelim.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  const bestStreak = Math.max(...history.map((h) => h.bestStreak));
+  if (avg >= 90) return `Ortalama %${avg.toFixed(0)} doğruluk — çarpım tablosunu neredeyse ezbere biliyorsun. En uzun serin ${bestStreak} doğru.`;
+  if (avg >= 70) return `Ortalama %${avg.toFixed(0)} doğruluk gayet iyi. En iyi turun %${best.toFixed(0)}, en uzun serin ${bestStreak} doğru.`;
+  return `Ortalama %${avg.toFixed(0)} — pratik yaptıkça çarpım tablosu hızla oturur, özellikle 6-9 arası çarpımlar herkesi biraz zorlar.`;
+}
+
+function CarpimGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [question, setQuestion] = useState(null);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [correctCount, setCorrectCount] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [feedback, setFeedback] = useState(null); // { chosen, correct } | null
+  const [result, setResult] = useState(null);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef(0);
+  const timerRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.carpim.accent;
+  const ACCENT_SOFT = GAME_THEMES.carpim.soft;
+  const diff = CARPIM_DIFFICULTIES[difficultyIndex];
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  function startGame() {
+    setQuestion(generateCarpimQuestion(diff.min, diff.max));
+    setQuestionIndex(0);
+    setCorrectCount(0);
+    setStreak(0);
+    setBestStreak(0);
+    setFeedback(null);
+    setResult(null);
+    setElapsedMs(0);
+    startTimeRef.current = Date.now();
+    timerRef.current = setInterval(() => setElapsedMs(Date.now() - startTimeRef.current), 500);
+    setPhase("playing");
+  }
+
+  function choose(option) {
+    if (phase !== "playing" || feedback) return;
+    const correct = option === question.correct;
+    setFeedback({ chosen: option, correct });
+    const nextCorrect = correct ? correctCount + 1 : correctCount;
+    const nextStreak = correct ? streak + 1 : 0;
+    setCorrectCount(nextCorrect);
+    setStreak(nextStreak);
+    const nextBestStreak = Math.max(bestStreak, nextStreak);
+    setBestStreak(nextBestStreak);
+    if (correct) playLineClearChime(1);
+
+    const delay = correct ? 700 : 2000;
+    setTimeout(() => {
+      const next = questionIndex + 1;
+      if (next >= CARPIM_TOTAL_QUESTIONS) {
+        clearInterval(timerRef.current);
+        const pct = (nextCorrect / CARPIM_TOTAL_QUESTIONS) * 100;
+        const timeMs = Date.now() - startTimeRef.current;
+        const points = nextCorrect * 100 + nextBestStreak * 30;
+        const entry = { pct, timeMs, bestStreak: nextBestStreak, points, id: Date.now() };
+        setHistory((prev) => [entry, ...prev].slice(0, 30));
+        setResult(entry);
+        trackEvent("game_round_complete", { game: "carpim", pct: Math.round(pct), difficulty: diff.label });
+        setPhase("result");
+      } else {
+        setQuestionIndex(next);
+        setQuestion(generateCarpimQuestion(diff.min, diff.max));
+        setFeedback(null);
+      }
+    }, delay);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const bestPct = history.length ? Math.max(...history.map((h) => h.pct)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Çarpım Ustası" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {CARPIM_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label} ({d.min}-{d.max})</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Ekranda bir çarpım sorusu belirecek (örn. "7 × 8"). Doğru cevabı 4 seçenek arasından bul, olabildiğince hızlı ve doğru işaretle. {CARPIM_TOTAL_QUESTIONS} soru sorulacak. Art arda doğru bildikçe serin uzayıp puan çarpanın artacak.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestPct !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{bestPct.toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && question && (
+        <>
+          <div style={{ display: "flex", gap: 18, fontSize: 12, color: PALETTE.dim, marginBottom: 20, alignItems: "center" }}>
+            <span>{questionIndex + 1} / {CARPIM_TOTAL_QUESTIONS}</span>
+            <span>Süre: <span className="mono" style={{ color: PALETTE.dim, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+            {streak > 1 && <span style={{ color: PALETTE.amber, fontWeight: 700 }}>🔥 x{streak}</span>}
+          </div>
+
+          <div style={{
+            fontSize: 44, fontWeight: 800, color: PALETTE.bright, marginBottom: 32,
+            display: "flex", alignItems: "center", gap: 12,
+          }}>
+            <span>{question.a}</span>
+            <span style={{ color: ACCENT }}>×</span>
+            <span>{question.b}</span>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, width: "100%", maxWidth: 300, marginBottom: 16 }}>
+            {question.options.map((opt) => {
+              const isChosen = feedback && feedback.chosen === opt;
+              const isCorrectOpt = feedback && opt === question.correct;
+              let bg = "rgba(255,255,255,0.03)";
+              let border = PALETTE.border;
+              let color = PALETTE.bright;
+              if (feedback && isCorrectOpt) { bg = "rgba(143,184,154,0.15)"; border = PALETTE.good; color = PALETTE.good; }
+              else if (feedback && isChosen && !isCorrectOpt) { bg = "rgba(201,112,94,0.15)"; border = PALETTE.bad; color = PALETTE.bad; }
+              return (
+                <button key={opt} type="button" onClick={() => choose(opt)} disabled={!!feedback}
+                  style={{
+                    padding: "18px 0", borderRadius: 14, border: `1px solid ${border}`,
+                    background: bg, color, fontSize: 22, fontWeight: 700, cursor: feedback ? "default" : "pointer",
+                  }}>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+
+          {feedback && (
+            <div style={{
+              fontSize: 18, fontWeight: 800, marginTop: 4,
+              color: feedback.correct ? PALETTE.good : PALETTE.bad,
+            }}>
+              {feedback.correct ? "✓ Doğru!" : `✕ Yanlış! Doğrusu: ${question.correct}`}
+            </div>
+          )}
+        </>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 40, fontWeight: 800, color: ACCENT, marginBottom: 2 }}>{result.points.toLocaleString("tr-TR")}</div>
+          <div style={{ fontSize: 11, color: PALETTE.faint, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>başarı puanı</div>
+          <div className="mono" style={{ fontSize: 22, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{result.pct.toFixed(0)} doğruluk</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 6 }}>{formatClock(result.timeMs)} · en uzun seri: {result.bestStreak}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text}</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- SIRALAMA BULMACASI (MANTIK MUHAKEMESİ) ---------------- */
+
+const MANTIK_ROUNDS = 5;
+const MANTIK_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", n: 4 },
+  { id: "zor", label: "Zor", n: 5 },
+];
+
+const MANTIK_PEOPLE = ["Ali", "Ayşe", "Mehmet", "Zeynep", "Can", "Elif", "Burak", "Selin", "Deniz", "Ege"];
+const MANTIK_ANIMALS = ["Tavşan", "Kaplumbağa", "Tilki", "Geyik", "Kartal", "Panter", "Çita", "Fil", "Zürafa", "Karınca"];
+
+const MANTIK_THEMES = [
+  { attribute: "boy", pool: MANTIK_PEOPLE, more: "daha uzun", less: "daha kısa", bestLabel: "en uzun", worstLabel: "en kısa" },
+  { attribute: "yaş", pool: MANTIK_PEOPLE, more: "daha yaşlı", less: "daha genç", bestLabel: "en yaşlı", worstLabel: "en genç" },
+  { attribute: "hız", pool: MANTIK_ANIMALS, more: "daha hızlı", less: "daha yavaş", bestLabel: "en hızlı", worstLabel: "en yavaş" },
+  { attribute: "ağırlık", pool: MANTIK_ANIMALS, more: "daha ağır", less: "daha hafif", bestLabel: "en ağır", worstLabel: "en hafif" },
+];
+
+function turkishDanSuffix(word) {
+  const back = "aıouAIOU";
+  const front = "eiöüEİÖÜ";
+  for (let i = word.length - 1; i >= 0; i--) {
+    if (back.includes(word[i])) return "'dan";
+    if (front.includes(word[i])) return "'den";
+  }
+  return "'dan";
+}
+
+function mantikAllPermutations(n) {
+  const result = [];
+  const arr = Array.from({ length: n }, (_, i) => i);
+  function permute(k) {
+    if (k === n) { result.push(arr.slice()); return; }
+    for (let i = k; i < n; i++) {
+      [arr[k], arr[i]] = [arr[i], arr[k]];
+      permute(k + 1);
+      [arr[k], arr[i]] = [arr[i], arr[k]];
+    }
+  }
+  permute(0);
+  return result;
+}
+
+function mantikCountMatches(perms, clues) {
+  let count = 0;
+  for (const perm of perms) {
+    let ok = true;
+    for (const [p, q, dir] of clues) {
+      if (dir ? !(perm[p] < perm[q]) : !(perm[p] > perm[q])) { ok = false; break; }
+    }
+    if (ok) count++;
+  }
+  return count;
+}
+
+function phraseMantikClue(theme, names, p, q, dir) {
+  const a = dir ? p : q;
+  const b = dir ? q : p;
+  // a, b'den [more]
+  if (Math.random() < 0.5) {
+    return `${names[a]}, ${names[b]}${turkishDanSuffix(names[b])} ${theme.more}.`;
+  }
+  return `${names[b]}, ${names[a]}${turkishDanSuffix(names[a])} ${theme.less}.`;
+}
+
+function generateMantikRound(n) {
+  const theme = MANTIK_THEMES[Math.floor(Math.random() * MANTIK_THEMES.length)];
+  const names = shuffleArr(theme.pool).slice(0, n);
+  const perms = mantikAllPermutations(n);
+  const trueRank = perms[Math.floor(Math.random() * perms.length)];
+
+  const basePairs = [];
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) basePairs.push([i, j]);
+  const shuffledPairs = shuffleArr(basePairs);
+
+  const clueTriples = [];
+  let currentCount = perms.length;
+  for (const [p, q] of shuffledPairs) {
+    if (currentCount === 1) break;
+    const dir = trueRank[p] < trueRank[q];
+    const candidate = [...clueTriples, [p, q, dir]];
+    const cnt = mantikCountMatches(perms, candidate);
+    if (cnt < currentCount) { clueTriples.push([p, q, dir]); currentCount = cnt; }
+  }
+
+  const clueTexts = shuffleArr(clueTriples.map(([p, q, dir]) => phraseMantikClue(theme, names, p, q, dir)));
+  const displayOrder = shuffleArr(Array.from({ length: n }, (_, i) => i));
+  const correctOrder = Array.from({ length: n }, (_, i) => i).sort((a, b) => trueRank[a] - trueRank[b]);
+
+  return { theme, names, clueTexts, displayOrder, correctOrder, n };
+}
+
+function mantikMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. İpuçlarına bakarak doğru sırayı bulmayı ilk turunda dene.";
+  const avg = history.reduce((s, h) => s + h.pct, 0) / history.length;
+  const best = Math.max(...history.map((h) => h.pct));
+  if (avg >= 90) return `Ortalama %${avg.toFixed(0)} doğruluk — ipuçlarından çıkarım yapma becerin gerçekten güçlü, LGS tarzı mantık sorularına hazırsın.`;
+  if (avg >= 65) return `Ortalama %${avg.toFixed(0)} doğruluk gayet iyi. En iyi turun %${best.toFixed(0)} — ipuçlarını birleştirerek adım adım ilerlemeye devam et.`;
+  return `Ortalama %${avg.toFixed(0)} — bu tür sorular sabır ister. İpucu: önce kesin olan bir ilişkiyi bul (örn. en uçtaki), oradan zincirleme ilerle.`;
+}
+
+function MantikGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [round, setRound] = useState(0);
+  const [puzzle, setPuzzle] = useState(null);
+  const [userOrder, setUserOrder] = useState([]);
+  const [feedback, setFeedback] = useState(null); // { correctPositions } | null
+  const [totalCorrectPositions, setTotalCorrectPositions] = useState(0);
+  const [totalPositions, setTotalPositions] = useState(0);
+  const [result, setResult] = useState(null);
+
+  const ACCENT = GAME_THEMES.mantik.accent;
+  const ACCENT_SOFT = GAME_THEMES.mantik.soft;
+  const diff = MANTIK_DIFFICULTIES[difficultyIndex];
+
+  function startGame() {
+    setRound(0);
+    setPuzzle(generateMantikRound(diff.n));
+    setUserOrder([]);
+    setFeedback(null);
+    setTotalCorrectPositions(0);
+    setTotalPositions(0);
+    setResult(null);
+    setPhase("playing");
+  }
+
+  function pickName(idx) {
+    if (phase !== "playing" || feedback || userOrder.includes(idx)) return;
+    const next = [...userOrder, idx];
+    setUserOrder(next);
+    if (next.length === puzzle.n) {
+      let correctPositions = 0;
+      for (let i = 0; i < puzzle.n; i++) if (next[i] === puzzle.correctOrder[i]) correctPositions++;
+      setFeedback({ correctPositions });
+      const newTotalCorrect = totalCorrectPositions + correctPositions;
+      const newTotalPositions = totalPositions + puzzle.n;
+      setTotalCorrectPositions(newTotalCorrect);
+      setTotalPositions(newTotalPositions);
+
+      setTimeout(() => {
+        const nextRound = round + 1;
+        if (nextRound >= MANTIK_ROUNDS) {
+          const pct = (newTotalCorrect / newTotalPositions) * 100;
+          const entry = { pct, id: Date.now() };
+          setHistory((prev) => [entry, ...prev].slice(0, 30));
+          setResult(entry);
+          trackEvent("game_round_complete", { game: "mantik", pct: Math.round(pct), difficulty: diff.label });
+          setPhase("result");
+        } else {
+          setRound(nextRound);
+          setPuzzle(generateMantikRound(diff.n));
+          setUserOrder([]);
+          setFeedback(null);
+        }
+      }, 1400);
+    }
+  }
+
+  function undoLast() {
+    if (feedback) return;
+    setUserOrder((prev) => prev.slice(0, -1));
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const acc = result ? accuracyLabel(result.pct) : null;
+  const bestPct = history.length ? Math.max(...history.map((h) => h.pct)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Sıralama Bulmacası" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {MANTIK_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label} ({d.n} kişi/hayvan)</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 310, marginBottom: 24, lineHeight: 1.6 }}>
+            Birkaç ipucu verilecek (örn. "Ali, Mehmet'ten daha uzun"). Bu ipuçlarını birleştirerek herkesi doğru sıraya diz — isimlere en baştakinden (örn. en uzun) en sondakine doğru sırayla dokun. {MANTIK_ROUNDS} tur sürüyor, tıpkı LGS'deki mantık muhakemesi sorularına benzer.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestPct !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: %{bestPct.toFixed(0)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && puzzle && (
+        <>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>{round + 1} / {MANTIK_ROUNDS}</div>
+
+          <div style={{
+            width: "100%", maxWidth: 320, borderRadius: 14, border: `1px solid ${PALETTE.border}`,
+            background: "rgba(255,255,255,0.02)", padding: "16px 18px", marginBottom: 20,
+          }}>
+            {puzzle.clueTexts.map((text, i) => (
+              <div key={i} style={{ color: PALETTE.text, fontSize: 13, lineHeight: 1.7 }}>• {text}</div>
+            ))}
+          </div>
+
+          <div style={{ fontSize: 11, color: PALETTE.faint, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+            {puzzle.theme.bestLabel} → {puzzle.theme.worstLabel}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 320, marginBottom: 20, flexWrap: "wrap" }}>
+            {Array.from({ length: puzzle.n }, (_, slot) => {
+              const chosenIdx = userOrder[slot];
+              const isFilled = chosenIdx !== undefined;
+              const isCorrectSlot = feedback && isFilled && chosenIdx === puzzle.correctOrder[slot];
+              return (
+                <div key={slot} style={{
+                  flex: 1, minWidth: 50, minHeight: 44, borderRadius: 10,
+                  border: `1px solid ${feedback ? (isCorrectSlot ? PALETTE.good : PALETTE.bad) : PALETTE.border}`,
+                  background: feedback ? (isCorrectSlot ? "rgba(143,184,154,0.12)" : "rgba(201,112,94,0.12)") : "rgba(255,255,255,0.02)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  color: isFilled ? PALETTE.bright : PALETTE.faint, fontSize: 12, fontWeight: 600, textAlign: "center", padding: "0 4px",
+                }}>
+                  {isFilled ? puzzle.names[chosenIdx] : slot + 1}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center", width: "100%", maxWidth: 320, marginBottom: 14 }}>
+            {puzzle.displayOrder.map((idx) => {
+              const used = userOrder.includes(idx);
+              return (
+                <button key={idx} type="button" onClick={() => pickName(idx)} disabled={used || !!feedback}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, border: `1px solid ${PALETTE.border}`,
+                    background: used ? "rgba(255,255,255,0.01)" : ACCENT_SOFT,
+                    color: used ? PALETTE.faint : PALETTE.bright,
+                    fontSize: 14, fontWeight: 600, cursor: used || feedback ? "default" : "pointer",
+                    opacity: used ? 0.4 : 1,
+                  }}>
+                  {puzzle.names[idx]}
+                </button>
+              );
+            })}
+          </div>
+
+          {!feedback && userOrder.length > 0 && (
+            <button type="button" onClick={undoLast}
+              style={{ padding: "8px 18px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 12, cursor: "pointer" }}>
+              Geri Al
+            </button>
+          )}
+
+          {feedback && (
+            <p style={{ color: PALETTE.dim, fontSize: 13, marginTop: 6 }}>
+              {feedback.correctPositions} / {puzzle.n} doğru yerde
+            </p>
+          )}
+        </>
+      )}
+
+      {phase === "result" && result && acc && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>%{result.pct.toFixed(0)}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: acc.color, marginBottom: 24 }}>{acc.text}</div>
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+/* ---------------- KAKURO ---------------- */
+
+const KAKURO_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", size: 7, blackProb: 0.28 },
+  { id: "zor", label: "Zor", size: 8, blackProb: 0.18 },
+];
+
+function kakuroMakeLayout(size, blackProb) {
+  const grid = Array.from({ length: size }, () => Array(size).fill("B"));
+  for (let r = 1; r < size; r++) for (let c = 1; c < size; c++) grid[r][c] = "W";
+
+  function wouldBeValidIfBlack(r, c) {
+    grid[r][c] = "B";
+    let ok = true;
+    for (const cc of [c - 1, c + 1]) {
+      if (cc >= 1 && cc <= size - 1) {
+        let start = cc;
+        while (start - 1 >= 1 && grid[r][start - 1] === "W") start--;
+        let end = cc;
+        while (end + 1 <= size - 1 && grid[r][end + 1] === "W") end++;
+        if (grid[r][cc] === "W" && end - start + 1 === 1) ok = false;
+      }
+    }
+    for (const rr of [r - 1, r + 1]) {
+      if (rr >= 1 && rr <= size - 1) {
+        let start = rr;
+        while (start - 1 >= 1 && grid[start - 1][c] === "W") start--;
+        let end = rr;
+        while (end + 1 <= size - 1 && grid[end + 1][c] === "W") end++;
+        if (grid[rr][c] === "W" && end - start + 1 === 1) ok = false;
+      }
+    }
+    grid[r][c] = "W";
+    return ok;
+  }
+
+  const candidates = [];
+  for (let r = 1; r < size; r++) for (let c = 1; c < size; c++) candidates.push([r, c]);
+  const shuffled = shuffleArr(candidates);
+  const targetBlack = Math.floor(shuffled.length * blackProb);
+  let placed = 0;
+  for (const [r, c] of shuffled) {
+    if (placed >= targetBlack) break;
+    if (grid[r][c] !== "W") continue;
+    if (wouldBeValidIfBlack(r, c)) { grid[r][c] = "B"; placed++; }
+  }
+  return grid;
+}
+
+function kakuroFindRuns(grid, size) {
+  const hRuns = [], vRuns = [];
+  for (let r = 0; r < size; r++) {
+    let c = 0;
+    while (c < size) {
+      if (grid[r][c] === "W") {
+        const start = c;
+        while (c < size && grid[r][c] === "W") c++;
+        hRuns.push([r, start, c - 1]);
+      } else c++;
+    }
+  }
+  for (let c = 0; c < size; c++) {
+    let r = 0;
+    while (r < size) {
+      if (grid[r][c] === "W") {
+        const start = r;
+        while (r < size && grid[r][c] === "W") r++;
+        vRuns.push([c, start, r - 1]);
+      } else r++;
+    }
+  }
+  return { hRuns, vRuns };
+}
+
+function kakuroBuildStructures(grid, size) {
+  const { hRuns, vRuns } = kakuroFindRuns(grid, size);
+  const cellH = {}, cellV = {}, hCells = {}, vCells = {};
+  hRuns.forEach(([r, start, end], i) => {
+    const cells = [];
+    for (let c = start; c <= end; c++) cells.push([r, c]);
+    hCells[i] = cells;
+    cells.forEach(([rr, cc], pos) => { cellH[`${rr}-${cc}`] = [i, pos]; });
+  });
+  vRuns.forEach(([c, start, end], i) => {
+    const cells = [];
+    for (let r = start; r <= end; r++) cells.push([r, c]);
+    vCells[i] = cells;
+    cells.forEach(([rr, cc], pos) => { cellV[`${rr}-${cc}`] = [i, pos]; });
+  });
+  return { hCells, vCells, cellH, cellV };
+}
+
+function kakuroFillSolution(cellH, cellV, hCells, vCells) {
+  const whiteCells = Object.keys(cellH).map((k) => k.split("-").map(Number)).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const solution = {};
+  function backtrack(idx) {
+    if (idx === whiteCells.length) return true;
+    const [r, c] = whiteCells[idx];
+    const key = `${r}-${c}`;
+    const digits = shuffleArr([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const [hId] = cellH[key];
+    const [vId] = cellV[key];
+    const usedH = new Set(hCells[hId].map(([rr, cc]) => solution[`${rr}-${cc}`]).filter((v) => v !== undefined));
+    const usedV = new Set(vCells[vId].map(([rr, cc]) => solution[`${rr}-${cc}`]).filter((v) => v !== undefined));
+    for (const d of digits) {
+      if (usedH.has(d) || usedV.has(d)) continue;
+      solution[key] = d;
+      if (backtrack(idx + 1)) return true;
+      delete solution[key];
+    }
+    return false;
+  }
+  return backtrack(0) ? solution : null;
+}
+
+function kakuroComputeClues(solution, hCells, vCells) {
+  const hClues = {}, vClues = {};
+  for (const id in hCells) hClues[id] = hCells[id].reduce((s, [r, c]) => s + solution[`${r}-${c}`], 0);
+  for (const id in vCells) vClues[id] = vCells[id].reduce((s, [r, c]) => s + solution[`${r}-${c}`], 0);
+  return { hClues, vClues };
+}
+
+function generateKakuroPuzzle(size, blackProb) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const grid = kakuroMakeLayout(size, blackProb);
+    const { hCells, vCells, cellH, cellV } = kakuroBuildStructures(grid, size);
+    if (Object.keys(cellH).length === 0) continue;
+    const solution = kakuroFillSolution(cellH, cellV, hCells, vCells);
+    if (!solution) continue;
+    const { hClues, vClues } = kakuroComputeClues(solution, hCells, vCells);
+
+    const clueMap = {};
+    for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+      if (grid[r][c] !== "B") continue;
+      let right = null, down = null;
+      if (c + 1 < size && grid[r][c + 1] === "W") right = hClues[cellH[`${r}-${c + 1}`][0]];
+      if (r + 1 < size && grid[r + 1][c] === "W") down = vClues[cellV[`${r + 1}-${c}`][0]];
+      if (right !== null || down !== null) clueMap[`${r}-${c}`] = { right, down };
+    }
+
+    return { grid, size, solution, clueMap };
+  }
+  return null;
+}
+
+function kakuroMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Toplamlara göre rakamları yerleştirmeyi ilk turunda dene — her satır ve sütun parçasında rakamlar tekrar edemez.";
+  const avgMs = history.reduce((s, h) => s + h.timeMs, 0) / history.length;
+  const avgMistakes = history.reduce((s, h) => s + h.mistakes, 0) / history.length;
+  const best = Math.min(...history.map((h) => h.timeMs));
+  if (avgMs <= 240000 && avgMistakes <= 1) return `Toplamlardan rakamları hızlıca çıkarıyorsun — ortalama ${formatClock(avgMs)}, ortalama ${avgMistakes.toFixed(1)} hata. En iyi çözümün ${formatClock(best)}.`;
+  if (avgMs <= 420000) return `Ortalama ${formatClock(avgMs)} sürede tamamlıyorsun, gayet iyi bir tempo.`;
+  return `Ortalama ${formatClock(avgMs)} sürüyor — Kakuro sabır ister. İpucu: küçük toplamlı kısa parçalardan başlamak (örn. 2 hücrede toplam 3 → kesin 1 ve 2'dir) işini kolaylaştırır.`;
+}
+
+function KakuroGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | loading | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [puzzle, setPuzzle] = useState(null);
+  const [userGrid, setUserGrid] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [mistakes, setMistakes] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const timerRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.kakuro.accent;
+  const ACCENT_SOFT = GAME_THEMES.kakuro.soft;
+  const diff = KAKURO_DIFFICULTIES[difficultyIndex];
+
+  useEffect(() => () => { if (timerRef.current) clearInterval(timerRef.current); }, []);
+
+  function startGame() {
+    setPhase("loading");
+    setTimeout(() => {
+      const p = generateKakuroPuzzle(diff.size, diff.blackProb);
+      setPuzzle(p);
+      setUserGrid(Array.from({ length: p.size }, () => Array(p.size).fill(0)));
+      setSelected(null);
+      setMistakes(0);
+      setStartTime(Date.now());
+      setElapsedMs(0);
+      setPhase("playing");
+    }, 50);
+  }
+
+  useEffect(() => {
+    if (phase === "playing") {
+      timerRef.current = setInterval(() => setElapsedMs(Date.now() - startTime), 500);
+      return () => clearInterval(timerRef.current);
+    }
+  }, [phase, startTime]);
+
+  function selectCell(r, c) {
+    if (phase !== "playing" || puzzle.grid[r][c] !== "W") return;
+    setSelected({ r, c });
+  }
+
+  function pressDigit(v) {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    const next = userGrid.map((row) => row.slice());
+    next[r][c] = v;
+    setUserGrid(next);
+    if (puzzle.solution[`${r}-${c}`] !== v) setMistakes((m) => m + 1);
+    const complete = puzzle.grid.every((row, ri) => row.every((cell, ci) => cell !== "W" || next[ri][ci] === puzzle.solution[`${ri}-${ci}`]));
+    if (complete) {
+      clearInterval(timerRef.current);
+      const timeMs = Date.now() - startTime;
+      const entry = { difficulty: diff.label, timeMs, mistakes, id: Date.now() };
+      setHistory((prev) => [entry, ...prev].slice(0, 30));
+      trackEvent("game_round_complete", { game: "kakuro", difficulty: entry.difficulty, timeMs, mistakes });
+      setPhase("result");
+    }
+  }
+
+  function eraseCell() {
+    if (phase !== "playing" || !selected) return;
+    const { r, c } = selected;
+    const next = userGrid.map((row) => row.slice());
+    next[r][c] = 0;
+    setUserGrid(next);
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestTime = history.length ? Math.min(...history.map((h) => h.timeMs)) : null;
+
+  return (
+    <Shell>
+      <TopBar title="Kakuro" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {KAKURO_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label}</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 310, marginBottom: 24, lineHeight: 1.6 }}>
+            Koyu hücrelerdeki sayılar ipucu: sağ üstteki rakam, o hücrenin sağındaki beyaz parçanın toplamını; sol alttaki ise altındaki parçanın toplamını gösterir. Her parçadaki rakamlar 1-9 arası olmalı ve aynı parça içinde tekrar edemez.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestTime !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi: {formatClock(bestTime)}</p>
+          )}
+        </>
+      )}
+
+      {phase === "loading" && (
+        <p style={{ color: PALETTE.dim, fontSize: 14, marginTop: 40 }}>Bulmaca hazırlanıyor…</p>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && puzzle && userGrid && (
+        <>
+          <div style={{ display: "flex", gap: 20, fontSize: 12, color: PALETTE.dim, marginBottom: 16 }}>
+            <span>Süre: <span className="mono" style={{ color: ACCENT, fontWeight: 600 }}>{formatClock(elapsedMs)}</span></span>
+            <span>Hata: <span style={{ color: mistakes > 0 ? PALETTE.bad : PALETTE.good, fontWeight: 600 }}>{mistakes}</span></span>
+          </div>
+
+          <div style={{
+            display: "grid", gridTemplateColumns: `repeat(${puzzle.size}, 1fr)`,
+            width: "100%", maxWidth: "min(420px, 92vw)", aspectRatio: "1",
+            border: `2px solid ${PALETTE.border}`, borderRadius: 8, overflow: "hidden", marginBottom: 18,
+          }}>
+            {puzzle.grid.flat().map((cellType, i) => {
+              const r = Math.floor(i / puzzle.size), c = i % puzzle.size;
+              if (cellType === "B") {
+                const clue = puzzle.clueMap[`${r}-${c}`];
+                return (
+                  <div key={i} style={{
+                    position: "relative", background: "rgba(0,0,0,0.35)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                  }}>
+                    {clue && clue.right !== null && (
+                      <span style={{ position: "absolute", top: 2, right: 3, fontSize: "clamp(8px, 1.8vw, 11px)", color: PALETTE.mid }}>{clue.right}</span>
+                    )}
+                    {clue && clue.down !== null && (
+                      <span style={{ position: "absolute", bottom: 2, left: 3, fontSize: "clamp(8px, 1.8vw, 11px)", color: PALETTE.mid }}>{clue.down}</span>
+                    )}
+                  </div>
+                );
+              }
+              const val = userGrid[r][c];
+              const isSelected = selected && selected.r === r && selected.c === c;
+              const isWrong = val !== 0 && puzzle.solution[`${r}-${c}`] !== val;
+              return (
+                <button key={i} type="button" onClick={() => selectCell(r, c)}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: isSelected ? hexToRgba(ACCENT, 0.2) : "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: isWrong ? PALETTE.bad : ACCENT,
+                    fontWeight: 700, fontSize: "clamp(14px, 3.6vw, 20px)", cursor: "pointer", padding: 0,
+                  }}>
+                  {val !== 0 ? val : ""}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(9, 1fr)", gap: 6, width: "100%", maxWidth: "min(420px, 92vw)", marginBottom: 12 }}>
+            {[1,2,3,4,5,6,7,8,9].map((n) => (
+              <button key={n} type="button" onClick={() => pressDigit(n)}
+                style={{ minHeight: 46, borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "rgba(255,255,255,0.03)", color: PALETTE.bright, fontSize: "clamp(15px, 3.6vw, 19px)", fontWeight: 600, cursor: "pointer" }}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={eraseCell}
+            style={{ padding: "10px 24px", borderRadius: 8, border: `1px solid ${PALETTE.border}`, background: "transparent", color: PALETTE.dim, fontSize: 14, cursor: "pointer" }}>
+            Sil
+          </button>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 32, fontWeight: 700, color: PALETTE.bright, marginBottom: 4 }}>{formatClock(elapsedMs)}</div>
+          <div style={{ fontSize: 12, color: PALETTE.dim, marginBottom: 10 }}>{mistakes} hata · {KAKURO_DIFFICULTIES[difficultyIndex].label}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: PALETTE.good, marginBottom: 24 }}>Tamamlandı!</div>
           <button type="button" onClick={playAgain}
             style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
             Tekrar
@@ -3770,6 +4636,9 @@ function Report({ type, history, onBack }) {
     linecompare: "Çizgi Kıyası Raporu",
     oddoneout: "Tek Farklı Raporu",
     blockblast: "Blok Patlatma Raporu",
+    carpim: "Çarpım Ustası Raporu",
+    mantik: "Sıralama Bulmacası Raporu",
+    kakuro: "Kakuro Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -3789,6 +4658,9 @@ function Report({ type, history, onBack }) {
     linecompare: lineCompareMessage,
     oddoneout: oddOneOutMessage,
     blockblast: blockBlastMessage,
+    carpim: carpimMessage,
+    mantik: mantikMessage,
+    kakuro: kakuroMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -3838,6 +4710,15 @@ function Report({ type, history, onBack }) {
     } else if (type === "blockblast") {
       best = Math.max(...history.map((h) => h.score)).toLocaleString("tr-TR");
       avg = Math.round(history.reduce((s, h) => s + h.score, 0) / count).toLocaleString("tr-TR");
+    } else if (type === "carpim") {
+      best = Math.max(...history.map((h) => h.pct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.pct, 0) / count).toFixed(0) + "%";
+    } else if (type === "mantik") {
+      best = Math.max(...history.map((h) => h.pct)).toFixed(0) + "%";
+      avg = (history.reduce((s, h) => s + h.pct, 0) / count).toFixed(0) + "%";
+    } else if (type === "kakuro") {
+      best = formatClock(Math.min(...history.map((h) => h.timeMs)));
+      avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
     }
   }
 
@@ -3955,6 +4836,22 @@ function Report({ type, history, onBack }) {
                 {type === "blockblast" && (
                   <span className="mono">{h.score.toLocaleString("tr-TR")}</span>
                 )}
+                {type === "carpim" && (
+                  <>
+                    <span style={{ color: accuracyLabel(h.pct).color }}>%{h.pct.toFixed(0)}</span>
+                    <span className="mono">seri {h.bestStreak}</span>
+                  </>
+                )}
+                {type === "mantik" && (
+                  <span style={{ color: accuracyLabel(h.pct).color }}>%{h.pct.toFixed(0)}</span>
+                )}
+                {type === "kakuro" && (
+                  <>
+                    <span>{h.difficulty}</span>
+                    <span className="mono">{formatClock(h.timeMs)}</span>
+                    <span style={{ color: h.mistakes === 0 ? PALETTE.good : PALETTE.amber }}>{h.mistakes} hata</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -3990,6 +4887,9 @@ function App() {
   const [linecompareHistory, setLinecompareHistory] = useState([]);
   const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
   const [blockBlastHistory, setBlockBlastHistory] = useState([]);
+  const [carpimHistory, setCarpimHistory] = useState([]);
+  const [mantikHistory, setMantikHistory] = useState([]);
+  const [kakuroHistory, setKakuroHistory] = useState([]);
   const [musicOn, setMusicOn] = useState(true);
   const [musicStatus, setMusicStatus] = useState("henüz başlamadı");
   const audioElRef = useRef(null);
@@ -4084,6 +4984,8 @@ function App() {
           nbackHistory={nbackHistory} balanceHistory={balanceHistory}
           quicksortHistory={quicksortHistory} linecompareHistory={linecompareHistory}
           oddoneoutHistory={oddoneoutHistory}
+          carpimHistory={carpimHistory}
+          mantikHistory={mantikHistory}
         />
       )}
       {view === "cat-puzzles" && (
@@ -4094,6 +4996,7 @@ function App() {
           game2048History={game2048History}
           minesweeperHistory={minesweeperHistory}
           skyscraperHistory={skyscraperHistory}
+          kakuroHistory={kakuroHistory}
         />
       )}
       {view === "cat-blockgames" && (
@@ -4217,6 +5120,27 @@ function App() {
           history={blockBlastHistory} setHistory={setBlockBlastHistory}
         />
       )}
+      {view === "carpim" && (
+        <CarpimGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-carpim")}
+          history={carpimHistory} setHistory={setCarpimHistory}
+        />
+      )}
+      {view === "mantik" && (
+        <MantikGame
+          onBack={() => setView("cat-mindsports")}
+          onReport={() => setView("report-mantik")}
+          history={mantikHistory} setHistory={setMantikHistory}
+        />
+      )}
+      {view === "kakuro" && (
+        <KakuroGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-kakuro")}
+          history={kakuroHistory} setHistory={setKakuroHistory}
+        />
+      )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
       {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
       {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
@@ -4234,6 +5158,9 @@ function App() {
       {view === "report-linecompare" && <Report type="linecompare" history={linecompareHistory} onBack={() => setView("linecompare")} />}
       {view === "report-oddoneout" && <Report type="oddoneout" history={oddoneoutHistory} onBack={() => setView("oddoneout")} />}
       {view === "report-blockblast" && <Report type="blockblast" history={blockBlastHistory} onBack={() => setView("blockblast")} />}
+      {view === "report-carpim" && <Report type="carpim" history={carpimHistory} onBack={() => setView("carpim")} />}
+      {view === "report-mantik" && <Report type="mantik" history={mantikHistory} onBack={() => setView("mantik")} />}
+      {view === "report-kakuro" && <Report type="kakuro" history={kakuroHistory} onBack={() => setView("kakuro")} />}
     </>
   );
 }
