@@ -24,6 +24,9 @@
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -36,6 +39,142 @@ function trackEvent(name, params) {
     if (typeof gtag === "function") gtag("event", name, params || {});
   } catch (e) {
     // sessizce yut - analitik hatası oyunu bozmasın
+  }
+}
+
+/* ---------------- FIREBASE: GRUP SIRALAMASI ---------------- */
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBWsso8pDnXowui8sA7Oa27Pv_naFy3ky8",
+  authDomain: "innerclock.firebaseapp.com",
+  projectId: "innerclock",
+  storageBucket: "innerclock.firebasestorage.app",
+  messagingSenderId: "130525716747",
+  appId: "1:130525716747:web:24966f29c486371ebfc20e",
+};
+
+let fbReady = false;
+try {
+  firebase.initializeApp(firebaseConfig);
+  fbReady = true;
+} catch (e) {
+  console.error("Firebase başlatılamadı:", e);
+}
+const fbAuth = fbReady ? firebase.auth() : null;
+const fbDb = fbReady ? firebase.firestore() : null;
+
+function ensureAnonymousAuth() {
+  return new Promise((resolve, reject) => {
+    if (!fbAuth) { reject(new Error("Firebase hazır değil")); return; }
+    const unsub = fbAuth.onAuthStateChanged((user) => {
+      unsub();
+      if (user) { resolve(user); return; }
+      fbAuth.signInAnonymously().then((cred) => resolve(cred.user)).catch(reject);
+    });
+  });
+}
+
+async function ensureUserProfile(nickname) {
+  const user = await ensureAnonymousAuth();
+  const ref = fbDb.collection("users").doc(user.uid);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    await ref.set({ nickname: nickname || "Oyuncu", createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  } else if (nickname && snap.data().nickname !== nickname) {
+    await ref.set({ nickname }, { merge: true });
+  }
+  return user.uid;
+}
+
+function randomGroupCode(len) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let out = "";
+  for (let i = 0; i < (len || 6); i++) out += chars[Math.floor(Math.random() * chars.length)];
+  return out;
+}
+
+async function createGroup(groupName) {
+  const user = await ensureAnonymousAuth();
+  const code = randomGroupCode(6);
+  await fbDb.collection("groups").doc(code).set({
+    name: groupName || "Arkadaş Grubu",
+    ownerId: user.uid,
+    members: [user.uid],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return code;
+}
+
+async function joinGroup(code) {
+  const user = await ensureAnonymousAuth();
+  const ref = fbDb.collection("groups").doc(code);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error("Grup bulunamadı, kodu kontrol et.");
+  const data = snap.data();
+  if (!data.members.includes(user.uid)) {
+    await ref.set({ members: [...data.members, user.uid] }, { merge: true });
+  }
+  return { id: snap.id, ...data };
+}
+
+async function getMyGroups() {
+  const user = await ensureAnonymousAuth();
+  const snaps = await fbDb.collection("groups").where("members", "array-contains", user.uid).get();
+  return snaps.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+async function submitScore(gameId, rawScore, groupIds) {
+  if (rawScore === null || rawScore === undefined || isNaN(rawScore)) return;
+  const user = await ensureAnonymousAuth();
+  await fbDb.collection("scores").add({
+    gameId,
+    userId: user.uid,
+    score: rawScore,
+    groupIds: groupIds || [],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+}
+
+async function getGroupLeaderboard(groupId, gameId, higherIsBetter, topN) {
+  const snaps = await fbDb.collection("scores")
+    .where("gameId", "==", gameId)
+    .where("groupIds", "array-contains", groupId)
+    .get();
+  const bestByUser = new Map();
+  snaps.docs.forEach((d) => {
+    const s = d.data();
+    const prev = bestByUser.get(s.userId);
+    const better = !prev || (higherIsBetter ? s.score > prev.score : s.score < prev.score);
+    if (better) bestByUser.set(s.userId, s);
+  });
+  const rows = await Promise.all(
+    Array.from(bestByUser.values()).map(async (s) => {
+      const userSnap = await fbDb.collection("users").doc(s.userId).get();
+      return { nickname: userSnap.exists ? userSnap.data().nickname : "Oyuncu", score: s.score };
+    })
+  );
+  rows.sort((a, b) => (higherIsBetter ? b.score - a.score : a.score - b.score));
+  return rows.slice(0, topN || 20);
+}
+
+/* ---------------- LOCAL GEÇMİŞ (localStorage) ---------------- */
+
+const HISTORY_STORAGE_KEY = "innerclock_histories_v1";
+
+function loadAllHistories() {
+  try {
+    const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveAllHistories(obj) {
+  try {
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(obj));
+  } catch (e) {
+    // depolama dolu/erişilemez olabilir, sessizce yut
   }
 }
 
@@ -4611,6 +4750,179 @@ function sudokuMessage(history) {
   return `Ortalama ${formatClock(avgMs)} sürüyor çözmen, bu tamamen normal — Sudoku sabır işi, hızın zamanla artacak.`;
 }
 
+function GroupLeaderboard({ gameId, rawScore, higherIsBetter, accent }) {
+  const [nickname, setNickname] = useState(() => localStorage.getItem("innerclock_nickname") || "");
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [joinCode, setJoinCode] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  useEffect(() => {
+    if (nickname) refreshGroups();
+    // eslint-disable-next-line
+  }, [nickname]);
+
+  useEffect(() => {
+    if (selectedGroup) {
+      getGroupLeaderboard(selectedGroup, gameId, higherIsBetter).then(setRows).catch((e) => setErrorMsg(e.message));
+    }
+    // eslint-disable-next-line
+  }, [selectedGroup, gameId]);
+
+  async function refreshGroups() {
+    try {
+      const g = await getMyGroups();
+      setGroups(g);
+      if (g.length && !selectedGroup) setSelectedGroup(g[0].id);
+    } catch (e) {
+      setErrorMsg(e.message);
+    }
+  }
+
+  async function handleSaveNickname() {
+    const n = nicknameInput.trim();
+    if (!n) return;
+    setBusy(true);
+    try {
+      localStorage.setItem("innerclock_nickname", n);
+      await ensureUserProfile(n);
+      setNickname(n);
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleCreateGroup() {
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      const code = await createGroup(newGroupName);
+      setNewGroupName("");
+      await refreshGroups();
+      setSelectedGroup(code);
+      alert("Grup oluşturuldu. Arkadaşlarınla bu kodu paylaş: " + code);
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleJoinGroup() {
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      await joinGroup(joinCode.trim().toUpperCase());
+      setJoinCode("");
+      await refreshGroups();
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleSendScore() {
+    setBusy(true);
+    setErrorMsg(null);
+    try {
+      const groupIds = groups.map((g) => g.id);
+      await submitScore(gameId, rawScore, groupIds);
+      setSent(true);
+      if (selectedGroup) {
+        const updated = await getGroupLeaderboard(selectedGroup, gameId, higherIsBetter);
+        setRows(updated);
+      }
+    } catch (e) {
+      setErrorMsg(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const boxStyle = {
+    width: "100%", maxWidth: 320, borderRadius: 16, border: `1px solid ${PALETTE.border}`,
+    background: "rgba(255,255,255,0.02)", padding: "18px 18px", marginTop: 16,
+  };
+  const inputStyle = {
+    padding: "8px 10px", borderRadius: 8, border: `1px solid ${PALETTE.border}`,
+    background: "#0F1219", color: PALETTE.bright, fontSize: 13,
+  };
+  const btnStyle = (disabled) => ({
+    padding: "8px 16px", borderRadius: 999, border: "none",
+    background: disabled ? "rgba(255,255,255,0.05)" : hexToRgba(accent || PALETTE.amber, 0.18),
+    color: disabled ? PALETTE.faint : PALETTE.bright, fontSize: 13, fontWeight: 600,
+    cursor: disabled ? "default" : "pointer",
+  });
+
+  if (!nickname) {
+    return (
+      <div style={boxStyle}>
+        <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 10 }}>Grup Sıralaması</div>
+        <p style={{ color: PALETTE.dim, fontSize: 13, marginBottom: 10 }}>Arkadaşlarınla skorlarını karşılaştırmak için önce bir takma ad gir:</p>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input style={{ ...inputStyle, flex: 1 }} value={nicknameInput} onChange={(e) => setNicknameInput(e.target.value)} placeholder="Takma adın" />
+          <button type="button" style={btnStyle(busy || !nicknameInput.trim())} disabled={busy || !nicknameInput.trim()} onClick={handleSaveNickname}>Kaydet</button>
+        </div>
+        {errorMsg && <p style={{ color: PALETTE.bad, fontSize: 12, marginTop: 8 }}>{errorMsg}</p>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={boxStyle}>
+      <div style={{ fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase", color: PALETTE.faint, marginBottom: 10 }}>Grup Sıralaması · {nickname}</div>
+
+      {rawScore !== null && rawScore !== undefined && !isNaN(rawScore) && (
+        <button type="button" style={{ ...btnStyle(busy || sent), marginBottom: 14 }} disabled={busy || sent} onClick={handleSendScore}>
+          {sent ? "Skor gönderildi ✓" : "Skorumu gruba gönder"}
+        </button>
+      )}
+
+      {groups.length === 0 && (
+        <p style={{ color: PALETTE.dim, fontSize: 13, marginBottom: 10 }}>Henüz bir gruba üye değilsin.</p>
+      )}
+
+      {groups.length > 0 && (
+        <>
+          <select value={selectedGroup || ""} onChange={(e) => setSelectedGroup(e.target.value)}
+            style={{ ...inputStyle, width: "100%", marginBottom: 10 }}>
+            {groups.map((g) => (
+              <option key={g.id} value={g.id}>{g.name} ({g.id})</option>
+            ))}
+          </select>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+            {rows.map((r, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: PALETTE.dim, padding: "6px 8px", borderRadius: 8, background: "rgba(255,255,255,0.02)" }}>
+                <span>{i + 1}. {r.nickname}</span>
+                <span className="mono" style={{ color: PALETTE.bright }}>{r.score}</span>
+              </div>
+            ))}
+            {rows.length === 0 && <p style={{ color: PALETTE.faint, fontSize: 12 }}>Bu grupta bu oyun için henüz skor yok.</p>}
+          </div>
+        </>
+      )}
+
+      <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <input style={{ ...inputStyle, flex: 1 }} placeholder="Yeni grup adı" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
+        <button type="button" style={btnStyle(busy)} disabled={busy} onClick={handleCreateGroup}>Oluştur</button>
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <input style={{ ...inputStyle, flex: 1 }} placeholder="Davet kodu" value={joinCode} onChange={(e) => setJoinCode(e.target.value)} />
+        <button type="button" style={btnStyle(busy || !joinCode.trim())} disabled={busy || !joinCode.trim()} onClick={handleJoinGroup}>Katıl</button>
+      </div>
+      {errorMsg && <p style={{ color: PALETTE.bad, fontSize: 12, marginTop: 8 }}>{errorMsg}</p>}
+    </div>
+  );
+}
+
 function Report({ type, history, onBack }) {
   const titles = {
     innerclock: "İç Saat Raporu",
@@ -4712,6 +5024,31 @@ function Report({ type, history, onBack }) {
     } else if (type === "kakuro") {
       best = formatClock(Math.min(...history.map((h) => h.timeMs)));
       avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
+    }
+  }
+
+  // Grup sıralaması için ham (sayısal) en iyi skor ve yön bilgisi
+  let bestRaw = null;
+  const higherIsBetterMap = {
+    innerclock: true, reaction: false, memory: true, count: true, stroop: true,
+    sudoku: false, "2048": true, minesweeper: true, tetris: true, skyscrapers: false,
+    nback: true, balance: true, linecompare: true, quicksort: false, oddoneout: false,
+    blockblast: true, carpim: true, mantik: true, kakuro: false,
+  };
+  const higherIsBetter = higherIsBetterMap[type] !== false;
+  if (count > 0) {
+    if (type === "innerclock" || type === "count" || type === "stroop" || type === "nback" || type === "balance" || type === "linecompare" || type === "carpim" || type === "mantik") {
+      const field = type === "stroop" ? "accuracyPct" : "pct";
+      bestRaw = Math.max(...history.map((h) => h[field]));
+    } else if (type === "reaction" || type === "oddoneout") {
+      bestRaw = Math.min(...history.map((h) => h.ms));
+    } else if (type === "memory" || type === "2048" || type === "tetris" || type === "blockblast") {
+      bestRaw = Math.max(...history.map((h) => h.score));
+    } else if (type === "sudoku" || type === "skyscrapers" || type === "quicksort" || type === "kakuro") {
+      bestRaw = Math.min(...history.map((h) => h.timeMs));
+    } else if (type === "minesweeper") {
+      const wins = history.filter((h) => h.outcome === "won");
+      bestRaw = wins.length ? (wins.length / count) * 100 : null;
     }
   }
 
@@ -4850,6 +5187,8 @@ function Report({ type, history, onBack }) {
           </div>
         </div>
       )}
+
+      <GroupLeaderboard gameId={type} rawScore={bestRaw} higherIsBetter={higherIsBetter} accent={ACCENT} />
     </Shell>
   );
 }
@@ -4862,27 +5201,28 @@ const BG_MUSIC_URL = "Free%20Fall.mp3";
 const BG_MUSIC_TARGET_VOLUME = 0.35;
 
 function App() {
+  const initialHistories = loadAllHistories();
   const [view, setView] = useState("home");
-  const [icHistory, setIcHistory] = useState([]);
+  const [icHistory, setIcHistory] = useState(() => initialHistories.innerclock || []);
   const [icStreak, setIcStreak] = useState(0);
-  const [reactionHistory, setReactionHistory] = useState([]);
-  const [memoryHistory, setMemoryHistory] = useState([]);
-  const [countHistory, setCountHistory] = useState([]);
-  const [stroopHistory, setStroopHistory] = useState([]);
-  const [sudokuHistory, setSudokuHistory] = useState([]);
-  const [game2048History, setGame2048History] = useState([]);
-  const [minesweeperHistory, setMinesweeperHistory] = useState([]);
-  const [tetrisHistory, setTetrisHistory] = useState([]);
-  const [skyscraperHistory, setSkyscraperHistory] = useState([]);
-  const [nbackHistory, setNbackHistory] = useState([]);
-  const [balanceHistory, setBalanceHistory] = useState([]);
-  const [quicksortHistory, setQuicksortHistory] = useState([]);
-  const [linecompareHistory, setLinecompareHistory] = useState([]);
-  const [oddoneoutHistory, setOddoneoutHistory] = useState([]);
-  const [blockBlastHistory, setBlockBlastHistory] = useState([]);
-  const [carpimHistory, setCarpimHistory] = useState([]);
-  const [mantikHistory, setMantikHistory] = useState([]);
-  const [kakuroHistory, setKakuroHistory] = useState([]);
+  const [reactionHistory, setReactionHistory] = useState(() => initialHistories.reaction || []);
+  const [memoryHistory, setMemoryHistory] = useState(() => initialHistories.memory || []);
+  const [countHistory, setCountHistory] = useState(() => initialHistories.count || []);
+  const [stroopHistory, setStroopHistory] = useState(() => initialHistories.stroop || []);
+  const [sudokuHistory, setSudokuHistory] = useState(() => initialHistories.sudoku || []);
+  const [game2048History, setGame2048History] = useState(() => initialHistories["2048"] || []);
+  const [minesweeperHistory, setMinesweeperHistory] = useState(() => initialHistories.minesweeper || []);
+  const [tetrisHistory, setTetrisHistory] = useState(() => initialHistories.tetris || []);
+  const [skyscraperHistory, setSkyscraperHistory] = useState(() => initialHistories.skyscrapers || []);
+  const [nbackHistory, setNbackHistory] = useState(() => initialHistories.nback || []);
+  const [balanceHistory, setBalanceHistory] = useState(() => initialHistories.balance || []);
+  const [quicksortHistory, setQuicksortHistory] = useState(() => initialHistories.quicksort || []);
+  const [linecompareHistory, setLinecompareHistory] = useState(() => initialHistories.linecompare || []);
+  const [oddoneoutHistory, setOddoneoutHistory] = useState(() => initialHistories.oddoneout || []);
+  const [blockBlastHistory, setBlockBlastHistory] = useState(() => initialHistories.blockblast || []);
+  const [carpimHistory, setCarpimHistory] = useState(() => initialHistories.carpim || []);
+  const [mantikHistory, setMantikHistory] = useState(() => initialHistories.mantik || []);
+  const [kakuroHistory, setKakuroHistory] = useState(() => initialHistories.kakuro || []);
   const [musicOn, setMusicOn] = useState(true);
   const [musicStatus, setMusicStatus] = useState("henüz başlamadı");
   const audioElRef = useRef(null);
@@ -4890,6 +5230,20 @@ function App() {
   const musicOnRef = useRef(true);
 
   useEffect(() => { musicOnRef.current = musicOn; }, [musicOn]);
+
+  useEffect(() => {
+    saveAllHistories({
+      innerclock: icHistory, reaction: reactionHistory, memory: memoryHistory,
+      count: countHistory, stroop: stroopHistory, sudoku: sudokuHistory,
+      "2048": game2048History, minesweeper: minesweeperHistory, tetris: tetrisHistory,
+      skyscrapers: skyscraperHistory, nback: nbackHistory, balance: balanceHistory,
+      quicksort: quicksortHistory, linecompare: linecompareHistory, oddoneout: oddoneoutHistory,
+      blockblast: blockBlastHistory, carpim: carpimHistory, mantik: mantikHistory, kakuro: kakuroHistory,
+    });
+  }, [icHistory, reactionHistory, memoryHistory, countHistory, stroopHistory, sudokuHistory,
+      game2048History, minesweeperHistory, tetrisHistory, skyscraperHistory, nbackHistory,
+      balanceHistory, quicksortHistory, linecompareHistory, oddoneoutHistory, blockBlastHistory,
+      carpimHistory, mantikHistory, kakuroHistory]);
 
   function fadeAudioTo(audio, target) {
     if (!audio) return;
