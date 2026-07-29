@@ -75,6 +75,7 @@ const GAME_THEMES = {
   carpim:     { accent: "#D95B7A", soft: "rgba(217,91,122,0.12)" },
   mantik:     { accent: "#7C9CBF", soft: "rgba(124,156,191,0.12)" },
   kakuro:     { accent: "#D9B25B", soft: "rgba(217,178,91,0.12)" },
+  kelimeoyunu:{ accent: "#B2D95B", soft: "rgba(178,217,91,0.12)" },
 };
 
 function Shell({ children }) {
@@ -261,7 +262,7 @@ function Home({ onSelect, musicOn, setMusicOn, musicStatus }) {
         icon={<span style={{ fontSize: 20, color: GAME_THEMES.sudoku.accent }}>⊞</span>}
         title="Bulmacalar"
         subtitle="Uzun soluklu klasikler"
-        count="5 oyun"
+        count="6 oyun"
         accent={GAME_THEMES.sudoku.accent}
         onClick={() => onSelect("cat-puzzles")}
       />
@@ -357,13 +358,14 @@ function MindSportsList({ onBack, onSelectGame, icHistory, reactionHistory, memo
   );
 }
 
-function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, skyscraperHistory, kakuroHistory }) {
+function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, minesweeperHistory, skyscraperHistory, kakuroHistory, kelimeOyunuHistory }) {
   const sudokuBest = sudokuHistory.length ? formatClock(Math.min(...sudokuHistory.map((h) => h.timeMs))) : null;
   const best2048 = game2048History.length ? Math.max(...game2048History.map((h) => h.score)).toLocaleString("tr-TR") : null;
   const msWins = minesweeperHistory.filter((h) => h.outcome === "won");
   const msBest = msWins.length ? `%${((msWins.length / minesweeperHistory.length) * 100).toFixed(0)} kazanma` : null;
   const skyBest = skyscraperHistory.length ? formatClock(Math.min(...skyscraperHistory.map((h) => h.timeMs))) : null;
   const kakuroBest = kakuroHistory.length ? formatClock(Math.min(...kakuroHistory.map((h) => h.timeMs))) : null;
+  const kelimeOyunuBest = kelimeOyunuHistory.length ? Math.max(...kelimeOyunuHistory.map((h) => h.score)) + " puan" : null;
 
   function selectGame(game) {
     trackEvent("game_open", { game });
@@ -382,6 +384,8 @@ function PuzzlesList({ onBack, onSelectGame, sudokuHistory, game2048History, min
         onClick={() => selectGame("skyscrapers")} />
       <GameCard icon={<span style={{ color: GAME_THEMES.kakuro.accent, fontSize: 16, fontWeight: 800 }}>Σ</span>} title="Kakuro" subtitle="Toplamlara göre rakamları yerleştir" stat={kakuroBest} accent={GAME_THEMES.kakuro.accent}
         onClick={() => selectGame("kakuro")} />
+      <GameCard icon={<span style={{ fontSize: 18 }}>🔤</span>} title="Kelime Oyunu" subtitle="Bitişik harfleri birleştir, kelime bul" stat={kelimeOyunuBest} accent={GAME_THEMES.kelimeoyunu.accent}
+        onClick={() => selectGame("kelimeoyunu")} />
     </CategoryList>
   );
 }
@@ -4644,6 +4648,347 @@ function OverallReport({ onBack, histories }) {
   );
 }
 
+/* ---------------- KELİME OYUNU ---------------- */
+
+const KELIME_WORD_LIST = [
+  "KEDİ","KÖPEK","ARABA","MASA","KAPI","PENCERE","OKUL","KALEM","DEFTER","KİTAP",
+  "GÜNEŞ","YILDIZ","BULUT","YAĞMUR","KAR","RÜZGAR","DENİZ","GÖL","NEHİR",
+  "DAĞ","ORMAN","AĞAÇ","ÇİÇEK","YAPRAK","KUŞ","BALIK","ASLAN","KAPLAN","FARE",
+  "TAVUK","İNEK","KOYUN","EŞEK","KUZU","ÖRDEK","TAVŞAN","ARI","SİNEK","YILAN",
+  "FİL","MAYMUN","AYI","KURT","TİLKİ","GEYİK","ANNE","BABA","KARDEŞ","TEYZE",
+  "AMCA","DAYI","HALA","DEDE","NİNE","ÇOCUK","BEBEK","KIRMIZI","MAVİ","YEŞİL",
+  "SARI","MOR","PEMBE","SİYAH","BEYAZ","SANDALYE","YATAK","DOLAP","AYNA",
+  "SAAT","TELEFON","EKRAN","ANAHTAR","ÇANTA","AYAKKABI","ŞAPKA","GÖMLEK",
+  "PANTOLON","ELBİSE","ÇORAP","EKMEK","SÜT","PEYNİR","YUMURTA","ELMA","ARMUT",
+  "MUZ","ÜZÜM","ÇİLEK","KARPUZ","KAVUN","PORTAKAL","LİMON","DOMATES","BİBER","PATATES",
+  "SOĞAN","SARIMSAK","PİRİNÇ","MAKARNA","ÇORBA","TUZ","ŞEKER","BAL","YAĞ","UN",
+  "ÖĞRETMEN","ÖĞRENCİ","SINIF","TAHTA","SİLGİ","CETVEL","BOYA",
+  "FUTBOL","BASKETBOL","VOLEYBOL","YÜZME","KOŞU","BİSİKLET","TOP","OYUN","MÜZİK","ŞARKI",
+  "DANS","RESİM","FİLM","GAZETE","DERGİ","MEKTUP","HABER","RADYO",
+];
+const KELIME_WORD_SET = new Set(KELIME_WORD_LIST);
+const KELIME_DIFFICULTIES = [
+  { id: "kolay", label: "Kolay", size: 4, roundMs: 60000, maxWords: 6 },
+  { id: "orta", label: "Orta", size: 5, roundMs: 90000, maxWords: 10 },
+  { id: "zor", label: "Zor", size: 6, roundMs: 120000, maxWords: 14 },
+];
+const KELIME_LETTER_POOL = ["A","A","A","A","E","E","E","E","İ","İ","İ","N","N","R","R","L","L","K","K","D","M","U","Y","T","S","O","B","Z","C","G","Ş","H","V","Ç","Ö","Ü","P","F"];
+
+function kelimeGetNeighbors(r, c, size) {
+  const result = [];
+  for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+    if (dr === 0 && dc === 0) continue;
+    const nr = r + dr, nc = c + dc;
+    if (nr >= 0 && nr < size && nc >= 0 && nc < size) result.push([nr, nc]);
+  }
+  return result;
+}
+
+function kelimeTryPath(grid, size, chars, start, nodeBudget) {
+  const path = [];
+  const visited = new Set();
+  function backtrack(idx, pos) {
+    if (nodeBudget[0]-- <= 0) return false;
+    const [r, c] = pos;
+    const key = `${r}-${c}`;
+    if (visited.has(key)) return false;
+    const existing = grid[r][c];
+    if (existing !== null && existing !== chars[idx]) return false;
+    visited.add(key);
+    path.push(pos);
+    if (idx === chars.length - 1) return true;
+    const neighbors = shuffleArr(kelimeGetNeighbors(r, c, size));
+    for (const n of neighbors) {
+      if (backtrack(idx + 1, n)) return true;
+    }
+    visited.delete(key);
+    path.pop();
+    return false;
+  }
+  return backtrack(0, start) ? path.slice() : null;
+}
+
+function kelimeTryPlaceWord(grid, size, word) {
+  const chars = Array.from(word);
+  const positions = [];
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) positions.push([r, c]);
+  const shuffledStarts = shuffleArr(positions);
+  const nodeBudget = [3000];
+  for (const start of shuffledStarts) {
+    if (nodeBudget[0] <= 0) break;
+    const path = kelimeTryPath(grid, size, chars, start, nodeBudget);
+    if (path) return path;
+  }
+  return null;
+}
+
+function generateKelimeGrid(size, maxWords) {
+  const grid = Array.from({ length: size }, () => Array(size).fill(null));
+  const candidates = shuffleArr(KELIME_WORD_LIST.filter((w) => Array.from(w).length >= 3 && Array.from(w).length <= size * size)).slice(0, 50);
+  const placedWords = [];
+  for (const word of candidates) {
+    if (placedWords.length >= maxWords) break;
+    const path = kelimeTryPlaceWord(grid, size, word);
+    if (path) {
+      const chars = Array.from(word);
+      path.forEach(([r, c], i) => { grid[r][c] = chars[i]; });
+      placedWords.push(word);
+    }
+  }
+  for (let r = 0; r < size; r++) for (let c = 0; c < size; c++) {
+    if (grid[r][c] === null) grid[r][c] = KELIME_LETTER_POOL[Math.floor(Math.random() * KELIME_LETTER_POOL.length)];
+  }
+  return { grid, size, placedWords };
+}
+
+function kelimeWordScore(len) {
+  return len;
+}
+
+function kelimeOyunuMessage(history) {
+  if (history.length === 0) return "Henüz hiç oynamadın. Bitişik harfleri birleştirerek kaç kelime bulabildiğini ilk turunda görelim.";
+  const best = Math.max(...history.map((h) => h.score));
+  const avgWords = history.reduce((s, h) => s + h.wordsFound, 0) / history.length;
+  if (best >= 25) return `En iyi skorun ${best} puan — kelime dağarcığın ve harf tarama hızın gerçekten iyi. Ortalama ${avgWords.toFixed(1)} kelime buluyorsun.`;
+  if (best >= 12) return `En iyi skorun ${best} puan, ortalama ${avgWords.toFixed(1)} kelime buluyorsun. Uzun kelimeler çok daha fazla puan getiriyor, onlara odaklanmayı dene.`;
+  return `En iyi skorun ${best} puan. İpucu: önce kısa (3-4 harfli) kolay kelimelerle başlayıp ızgarayı tanımaya çalış, sonra uzun kelimelere geç.`;
+}
+
+function KelimeOyunuGame({ onBack, onReport, history, setHistory }) {
+  const [phase, setPhase] = useState("idle"); // idle | playing | ad | result
+  const [difficultyIndex, setDifficultyIndex] = useState(0);
+  const [puzzle, setPuzzle] = useState(null);
+  const [path, setPath] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [foundWords, setFoundWords] = useState([]);
+  const [score, setScore] = useState(0);
+  const [flash, setFlash] = useState(null); // 'valid' | 'invalid' | null
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const startTimeRef = useRef(0);
+  const timerRef = useRef(null);
+  const boardRef = useRef(null);
+  const flashTimeoutRef = useRef(null);
+
+  const ACCENT = GAME_THEMES.kelimeoyunu.accent;
+  const ACCENT_SOFT = GAME_THEMES.kelimeoyunu.soft;
+  const diff = KELIME_DIFFICULTIES[difficultyIndex];
+
+  useEffect(() => () => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (flashTimeoutRef.current) clearTimeout(flashTimeoutRef.current);
+  }, []);
+
+  function endGame(finalScore, finalWords) {
+    clearInterval(timerRef.current);
+    const entry = { score: finalScore, wordsFound: finalWords.length, id: Date.now() };
+    setHistory((prev) => [entry, ...prev].slice(0, 30));
+    trackEvent("game_round_complete", { game: "kelimeoyunu", score: finalScore, wordsFound: finalWords.length, difficulty: diff.label });
+    setPhase("result");
+  }
+
+  function startGame() {
+    const p = generateKelimeGrid(diff.size, diff.maxWords);
+    setPuzzle(p);
+    setPath([]);
+    setFoundWords([]);
+    setScore(0);
+    setFlash(null);
+    startTimeRef.current = Date.now();
+    setElapsedMs(0);
+    setPhase("playing");
+    timerRef.current = setInterval(() => {
+      const remain = diff.roundMs - (Date.now() - startTimeRef.current);
+      if (remain <= 0) {
+        setElapsedMs(diff.roundMs);
+      } else {
+        setElapsedMs(Date.now() - startTimeRef.current);
+      }
+    }, 250);
+  }
+
+  // Süre dolunca oyunu bitir (ayrı bir efekt olarak, en güncel score/foundWords ile)
+  useEffect(() => {
+    if (phase === "playing" && elapsedMs >= diff.roundMs) {
+      endGame(score, foundWords);
+    }
+  }, [elapsedMs, phase]);
+
+  function getCellFromPoint(clientX, clientY) {
+    if (!boardRef.current || !puzzle) return null;
+    const rect = boardRef.current.getBoundingClientRect();
+    const cellSize = rect.width / puzzle.size;
+    const c = Math.floor((clientX - rect.left) / cellSize);
+    const r = Math.floor((clientY - rect.top) / cellSize);
+    if (r < 0 || r >= puzzle.size || c < 0 || c >= puzzle.size) return null;
+    return [r, c];
+  }
+
+  function extendPath(cell) {
+    setPath((prev) => {
+      if (prev.length === 0) return [cell];
+      const last = prev[prev.length - 1];
+      if (last[0] === cell[0] && last[1] === cell[1]) return prev;
+      if (prev.length >= 2) {
+        const secondLast = prev[prev.length - 2];
+        if (secondLast[0] === cell[0] && secondLast[1] === cell[1]) return prev.slice(0, -1);
+      }
+      const isAdjacent = Math.abs(last[0] - cell[0]) <= 1 && Math.abs(last[1] - cell[1]) <= 1;
+      const alreadyIn = prev.some(([r, c]) => r === cell[0] && c === cell[1]);
+      if (isAdjacent && !alreadyIn) return [...prev, cell];
+      return prev;
+    });
+  }
+
+  function handlePointerDown(e) {
+    if (phase !== "playing") return;
+    e.preventDefault();
+    const cell = getCellFromPoint(e.clientX, e.clientY);
+    if (!cell) return;
+    setDragging(true);
+    setFlash(null);
+    setPath([cell]);
+  }
+  function handlePointerMove(e) {
+    if (!dragging || phase !== "playing") return;
+    e.preventDefault();
+    const cell = getCellFromPoint(e.clientX, e.clientY);
+    if (cell) extendPath(cell);
+  }
+  function handlePointerUp(e) {
+    if (!dragging) return;
+    e.preventDefault();
+    setDragging(false);
+    submitPath();
+  }
+
+  function submitPath() {
+    setPath((currentPath) => {
+      if (currentPath.length < 3 || !puzzle) return [];
+      const word = currentPath.map(([r, c]) => puzzle.grid[r][c]).join("");
+      const alreadyFound = foundWords.includes(word);
+      if (KELIME_WORD_SET.has(word) && !alreadyFound) {
+        const gained = kelimeWordScore(Array.from(word).length);
+        const newScore = score + gained;
+        const newFound = [...foundWords, word];
+        setScore(newScore);
+        setFoundWords(newFound);
+        setFlash("valid");
+        playLineClearChime(1);
+      } else {
+        setFlash("invalid");
+      }
+      flashTimeoutRef.current = setTimeout(() => setFlash(null), 350);
+      return [];
+    });
+  }
+
+  function playAgain() { setPhase("ad"); }
+  function finishAd() { startGame(); }
+
+  const bestScoreEver = history.length ? Math.max(...history.map((h) => h.score)) : null;
+  const remainingMs = Math.max(0, diff.roundMs - elapsedMs);
+  const currentWord = puzzle && path.length ? path.map(([r, c]) => puzzle.grid[r][c]).join("") : "";
+
+  return (
+    <Shell>
+      <TopBar title="Kelime Oyunu" onBack={onBack} onReport={onReport} accent={ACCENT} />
+
+      {phase === "idle" && (
+        <>
+          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+            {KELIME_DIFFICULTIES.map((d, i) => (
+              <button key={d.id} type="button" onClick={() => setDifficultyIndex(i)}
+                style={{
+                  padding: "8px 16px", borderRadius: 999,
+                  border: `1px solid ${difficultyIndex === i ? ACCENT : PALETTE.border}`,
+                  background: difficultyIndex === i ? ACCENT_SOFT : "transparent",
+                  color: difficultyIndex === i ? PALETTE.bright : "#8B93A7",
+                  fontSize: 13, cursor: "pointer",
+                }}>{d.label}</button>
+            ))}
+          </div>
+          <p style={{ color: PALETTE.dim, fontSize: 13, textAlign: "center", maxWidth: 300, marginBottom: 24, lineHeight: 1.6 }}>
+            Parmağını harflerin üzerinde gezdir, bitişik harfleri birleştirip bir kelime oluştur, bırakınca kontrol edilir. {Math.round(diff.roundMs / 1000)} saniyen var — puan, bulduğun kelimenin uzunluğu kadar.
+          </p>
+          <button type="button" onClick={startGame}
+            style={{ width: 180, height: 180, borderRadius: "50%", border: `1px solid ${PALETTE.border}`, cursor: "pointer", background: `radial-gradient(circle, ${hexToRgba(ACCENT, 0.16)} 0%, #12161F 75%)`, color: PALETTE.bright, fontSize: 16, fontWeight: 500 }}>Başla</button>
+          {bestScoreEver !== null && (
+            <p style={{ color: PALETTE.faint, fontSize: 12, marginTop: 20 }}>En iyi skor: {bestScoreEver} puan</p>
+          )}
+        </>
+      )}
+
+      {phase === "ad" && <AdScreen onDone={finishAd} />}
+
+      {phase === "playing" && puzzle && (
+        <>
+          <div style={{ display: "flex", gap: 18, fontSize: 12, color: PALETTE.dim, marginBottom: 12 }}>
+            <span>Süre: <span className="mono" style={{ color: remainingMs < 15000 ? PALETTE.bad : ACCENT, fontWeight: 700 }}>{Math.ceil(remainingMs / 1000)}sn</span></span>
+            <span>Skor: <span className="mono" style={{ color: PALETTE.bright, fontWeight: 700 }}>{score}</span></span>
+          </div>
+
+          <div style={{
+            minHeight: 28, fontSize: 22, fontWeight: 800, letterSpacing: "0.05em", marginBottom: 10,
+            color: flash === "valid" ? PALETTE.good : flash === "invalid" ? PALETTE.bad : PALETTE.bright,
+          }}>
+            {currentWord}
+          </div>
+
+          <div ref={boardRef}
+            onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}
+            style={{
+              display: "grid", gridTemplateColumns: `repeat(${puzzle.size}, 1fr)`,
+              width: "100%", maxWidth: "min(340px, 82vw)", aspectRatio: "1",
+              border: `2px solid ${PALETTE.border}`, borderRadius: 14, overflow: "hidden", marginBottom: 16,
+              background: "rgba(0,0,0,0.25)", touchAction: "none", gap: 2, padding: 3, boxSizing: "border-box",
+            }}>
+            {puzzle.grid.flat().map((letter, i) => {
+              const r = Math.floor(i / puzzle.size), c = i % puzzle.size;
+              const inPath = path.some(([pr, pc]) => pr === r && pc === c);
+              return (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: inPath ? hexToRgba(ACCENT, 0.4) : "rgba(255,255,255,0.03)",
+                  border: `1px solid ${inPath ? hexToRgba(ACCENT, 0.7) : "rgba(255,255,255,0.06)"}`,
+                  borderRadius: 8, color: PALETTE.bright, fontWeight: 700,
+                  fontSize: "clamp(18px, 5.5vw, 26px)", userSelect: "none",
+                }}>
+                  {letter}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ width: "100%", maxWidth: "min(340px, 82vw)", display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {foundWords.map((w) => (
+              <span key={w} style={{ padding: "4px 10px", borderRadius: 999, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 12 }}>{w}</span>
+            ))}
+          </div>
+        </>
+      )}
+
+      {phase === "result" && (
+        <div style={{ textAlign: "center" }}>
+          <div className="mono" style={{ fontSize: 40, fontWeight: 800, color: ACCENT, marginBottom: 4 }}>{score}</div>
+          <div style={{ fontSize: 11, color: PALETTE.faint, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>puan</div>
+          <div style={{ fontSize: 13, color: PALETTE.dim, marginBottom: 20 }}>{foundWords.length} kelime bulundu</div>
+          {foundWords.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, justifyContent: "center", maxWidth: 300, marginBottom: 24 }}>
+              {foundWords.map((w) => (
+                <span key={w} style={{ padding: "4px 10px", borderRadius: 999, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 12 }}>{w}</span>
+              ))}
+            </div>
+          )}
+          <button type="button" onClick={playAgain}
+            style={{ padding: "12px 26px", borderRadius: 999, border: `1px solid ${PALETTE.border}`, background: ACCENT_SOFT, color: PALETTE.bright, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Tekrar
+          </button>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
 /* ---------------- RAPOR ---------------- */
 
 function innerclockMessage(history) {
@@ -4728,6 +5073,7 @@ function Report({ type, history, onBack }) {
     carpim: "Çarpım Ustası Raporu",
     mantik: "Sıralama Bulmacası Raporu",
     kakuro: "Kakuro Raporu",
+    kelimeoyunu: "Kelime Oyunu Raporu",
   };
   const title = titles[type];
   const messageFns = {
@@ -4750,6 +5096,7 @@ function Report({ type, history, onBack }) {
     carpim: carpimMessage,
     mantik: mantikMessage,
     kakuro: kakuroMessage,
+    kelimeoyunu: kelimeOyunuMessage,
   };
   const message = messageFns[type](history);
   const count = history.length;
@@ -4808,6 +5155,9 @@ function Report({ type, history, onBack }) {
     } else if (type === "kakuro") {
       best = formatClock(Math.min(...history.map((h) => h.timeMs)));
       avg = formatClock(history.reduce((s, h) => s + h.timeMs, 0) / count);
+    } else if (type === "kelimeoyunu") {
+      best = Math.max(...history.map((h) => h.score)) + " puan";
+      avg = Math.round(history.reduce((s, h) => s + h.score, 0) / count) + " puan";
     }
   }
 
@@ -4941,6 +5291,12 @@ function Report({ type, history, onBack }) {
                     <span style={{ color: h.mistakes === 0 ? PALETTE.good : PALETTE.amber }}>{h.mistakes} hata</span>
                   </>
                 )}
+                {type === "kelimeoyunu" && (
+                  <>
+                    <span className="mono">{h.score} puan</span>
+                    <span style={{ color: GAME_THEMES.kelimeoyunu.accent }}>{h.wordsFound} kelime</span>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -4979,6 +5335,7 @@ function App() {
   const [carpimHistory, setCarpimHistory] = useState([]);
   const [mantikHistory, setMantikHistory] = useState([]);
   const [kakuroHistory, setKakuroHistory] = useState([]);
+  const [kelimeOyunuHistory, setKelimeOyunuHistory] = useState([]);
   const [musicOn, setMusicOn] = useState(true);
   const [musicStatus, setMusicStatus] = useState("henüz başlamadı");
   const audioElRef = useRef(null);
@@ -5111,6 +5468,7 @@ function App() {
           minesweeperHistory={minesweeperHistory}
           skyscraperHistory={skyscraperHistory}
           kakuroHistory={kakuroHistory}
+          kelimeOyunuHistory={kelimeOyunuHistory}
         />
       )}
       {view === "cat-blockgames" && (
@@ -5255,6 +5613,13 @@ function App() {
           history={kakuroHistory} setHistory={setKakuroHistory}
         />
       )}
+      {view === "kelimeoyunu" && (
+        <KelimeOyunuGame
+          onBack={() => setView("cat-puzzles")}
+          onReport={() => setView("report-kelimeoyunu")}
+          history={kelimeOyunuHistory} setHistory={setKelimeOyunuHistory}
+        />
+      )}
       {view === "feedback" && <FeedbackForm onBack={() => setView("home")} />}
       {view === "report-innerclock" && <Report type="innerclock" history={icHistory} onBack={() => setView("innerclock")} />}
       {view === "report-reaction" && <Report type="reaction" history={reactionHistory} onBack={() => setView("reaction")} />}
@@ -5275,6 +5640,7 @@ function App() {
       {view === "report-carpim" && <Report type="carpim" history={carpimHistory} onBack={() => setView("carpim")} />}
       {view === "report-mantik" && <Report type="mantik" history={mantikHistory} onBack={() => setView("mantik")} />}
       {view === "report-kakuro" && <Report type="kakuro" history={kakuroHistory} onBack={() => setView("kakuro")} />}
+      {view === "report-kelimeoyunu" && <Report type="kelimeoyunu" history={kelimeOyunuHistory} onBack={() => setView("kelimeoyunu")} />}
     </>
   );
 }
